@@ -22,7 +22,7 @@ const db = getFirestore();
 const provider = new GoogleAuthProvider();
 
 // ==========================================
-// 🃏 卡牌資料庫 (Card Database)
+// 🃏 卡牌資料庫
 // ==========================================
 const CARD_DB = [
     // SSR (5%)
@@ -51,13 +51,13 @@ const CARD_DB = [
 
 const GACHA_RATES = { SSR: 0.05, SR: 0.20, R: 0.50 };
 
-// 狀態變數
+// 全域狀態
 let currentUserData = null;
 let quizBuffer = [];
 const BUFFER_SIZE = 3;
 let isFetchingQuiz = false;
+let currentActiveQuiz = null; // 當前正在作答的題目
 let currentLang = 'zh-TW';
-let currentActiveQuiz = null;
 
 // ==========================================
 // 🚀 Auth & Init
@@ -70,14 +70,13 @@ onAuthStateChanged(auth, async (user) => {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('bottom-nav').classList.remove('hidden');
         
-        // 載入或建立使用者資料
         const userRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(userRef);
         
         if (docSnap.exists()) {
             currentUserData = docSnap.data();
             if (!currentUserData.cardInventory) currentUserData.cardInventory = [];
-            if (!currentUserData.gold && currentUserData.gold !== 0) currentUserData.gold = 500;
+            if (!currentUserData.settings) currentUserData.settings = {}; // 確保設定存在
         } else {
             currentUserData = {
                 uid: user.uid,
@@ -86,15 +85,17 @@ onAuthStateChanged(auth, async (user) => {
                 gold: 500, 
                 cardInventory: [], 
                 totalPower: 0,
+                settings: { level: '國中', strong: '', weak: '', source: 'ai' }, // 預設設定
                 createdAt: serverTimestamp()
             };
             await setDoc(userRef, currentUserData);
         }
 
         updateUIHeader();
+        updateSettingsUI(); // 填入設定表單
         renderHomeHero();
         switchToPage('page-home');
-        fillQuizBuffer(); // 預載題目
+        fillQuizBuffer();
 
     } else {
         document.getElementById('login-screen').classList.remove('hidden');
@@ -103,12 +104,56 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ==========================================
+// ⚙️ 設定 (Settings)
+// ==========================================
+window.updateSettingsUI = () => {
+    if (!currentUserData || !currentUserData.settings) return;
+    const s = currentUserData.settings;
+    document.getElementById('set-level').value = s.level || '國中';
+    document.getElementById('set-strong').value = s.strong || '';
+    document.getElementById('set-weak').value = s.weak || '';
+    document.getElementById('set-source').value = s.source || 'ai';
+};
+
+window.saveSettings = async () => {
+    if (!auth.currentUser) return;
+    
+    const newSettings = {
+        level: document.getElementById('set-level').value,
+        strong: document.getElementById('set-strong').value,
+        weak: document.getElementById('set-weak').value,
+        source: document.getElementById('set-source').value
+    };
+
+    const btn = document.querySelector('button[onclick="saveSettings()"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<div class="loader w-4 h-4 border-2"></div> 保存中...';
+    btn.disabled = true;
+
+    try {
+        await updateDoc(doc(db, "users", auth.currentUser.uid), { settings: newSettings });
+        currentUserData.settings = newSettings;
+        
+        // 清空舊緩衝，因為題目設定變了
+        quizBuffer = []; 
+        fillQuizBuffer();
+        
+        alert("設定已更新！接下來的討伐將套用新設定。");
+    } catch (e) {
+        console.error(e);
+        alert("保存失敗");
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+// ==========================================
 // 🏠 UI & Navigation
 // ==========================================
 function updateUIHeader() {
     if (!currentUserData) return;
     
-    // 計算總戰力
     const cards = currentUserData.cardInventory.map(c => CARD_DB.find(db => db.id === c.cardId)).filter(Boolean);
     cards.sort((a, b) => b.power - a.power);
     const topPower = cards.slice(0, 5).reduce((sum, c) => sum + c.power, 0);
@@ -120,8 +165,6 @@ function updateUIHeader() {
     document.getElementById('header-power').innerText = topPower;
     const level = Math.floor(topPower / 1000) + 1;
     document.getElementById('header-level').innerText = level;
-    
-    // 同步更新Gacha頁面的金幣 (如果有顯示的話)
 }
 
 function renderHomeHero() {
@@ -183,13 +226,11 @@ window.switchToPage = (pageId) => {
 window.startAdventure = async () => {
     switchToPage('page-adventure');
     
-    // 🔥 修正邏輯：如果當前已經有題目，直接渲染該題目，不消耗緩衝區
     if (currentActiveQuiz) {
         renderQuizToDOM(currentActiveQuiz);
         return;
     }
     
-    // 如果緩衝區沒題目，嘗試抓取
     if (quizBuffer.length === 0) {
         document.getElementById('quiz-loading').classList.remove('hidden');
         document.getElementById('quiz-container').classList.add('hidden');
@@ -205,17 +246,38 @@ window.startAdventure = async () => {
     renderNextQuestion();
 };
 
+// 決定下一個題目主題
+function getNextSubject() {
+    const s = currentUserData.settings || {};
+    const weakList = s.weak ? s.weak.split(/[,，\s]+/).filter(v=>v) : [];
+    const strongList = s.strong ? s.strong.split(/[,，\s]+/).filter(v=>v) : [];
+    const fallback = ["歷史", "科學", "地理", "常識", "科技"];
+
+    // 60% 機率出弱項，30% 機率出強項，10% 隨機
+    const rand = Math.random();
+    if (weakList.length > 0 && rand < 0.6) {
+        return weakList[Math.floor(Math.random() * weakList.length)];
+    } else if (strongList.length > 0 && rand < 0.9) {
+        return strongList[Math.floor(Math.random() * strongList.length)];
+    } else {
+        return fallback[Math.floor(Math.random() * fallback.length)];
+    }
+}
+
 async function fetchOneQuestion() {
     isFetchingQuiz = true;
+    const settings = currentUserData.settings || {};
+    const targetSubject = getNextSubject();
+    
     try {
         const response = await fetch('/api/generate-quiz', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                subject: "History", 
-                level: "General", 
-                rank: "Novice", 
-                difficulty: "easy",
+                subject: targetSubject, 
+                level: settings.level || "國中", 
+                rank: "Adventurer", 
+                difficulty: "medium",
                 language: currentLang 
             })
         });
@@ -229,7 +291,8 @@ async function fetchOneQuestion() {
         let options = [quizData.correct, ...quizData.wrong];
         options.sort(() => Math.random() - 0.5);
         
-        quizBuffer.push({ ...quizData, options });
+        // 加上主題標籤，方便顯示
+        quizBuffer.push({ ...quizData, options, subject: targetSubject });
         return true;
     } catch (e) {
         console.error("Fetch Quiz Error:", e);
@@ -241,33 +304,27 @@ async function fetchOneQuestion() {
 
 async function fillQuizBuffer() {
     if (isFetchingQuiz) return;
-    // 簡單的背景補充機制
     if (quizBuffer.length < BUFFER_SIZE) {
         await fetchOneQuestion();
     }
 }
 
 function renderNextQuestion() {
-    if (quizBuffer.length === 0) {
-        fillQuizBuffer(); // 觸發補充
-        return; 
-    }
+    if (quizBuffer.length === 0) return;
 
-    // 🔥 從緩衝區取出新題目，並存入 currentActiveQuiz
     currentActiveQuiz = quizBuffer.shift();
-    fillQuizBuffer(); // 背景補貨
-
-    // 渲染畫面
+    fillQuizBuffer(); 
     renderQuizToDOM(currentActiveQuiz);
 }
 
-// 🔥 新增：專門負責把題目畫到螢幕上的函式
 function renderQuizToDOM(quiz) {
     document.getElementById('quiz-loading').classList.add('hidden');
     document.getElementById('quiz-container').classList.remove('hidden');
     document.getElementById('quiz-feedback').classList.add('hidden');
 
     document.getElementById('question-text').innerText = quiz.q;
+    document.getElementById('quiz-target-subject').innerText = `目標：${quiz.subject || '未知領域'}`;
+    
     const container = document.getElementById('options-container');
     container.innerHTML = '';
 
@@ -309,14 +366,13 @@ window.nextQuestion = () => {
     if (quizBuffer.length > 0) {
         renderNextQuestion();
     } else {
-        // 如果沒庫存，重新觸發載入
-        startAdventure();
+        startAdventure(); // 重新觸發載入
     }
 };
 
 window.giveUpQuiz = () => {
     if(confirm("確定要撤退嗎？這題將會被跳過。")) {
-        currentActiveQuiz = null; // 🔥 清空當前題目
+        currentActiveQuiz = null;
         switchToPage('page-home');
     }
 };
@@ -400,9 +456,8 @@ function showGachaResults(cards) {
 
 window.closeGachaResult = () => {
     document.getElementById('gacha-result-overlay').classList.add('hidden');
-    // 如果是新手第一次抽卡，抽完自動回到 Deck 頁面或 Home 頁面
     if (document.getElementById('page-gacha').classList.contains('hidden')) {
-        updateUIHeader(); // 確保 UI 刷新
+        updateUIHeader();
     }
 };
 
