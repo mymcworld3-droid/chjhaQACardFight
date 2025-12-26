@@ -320,6 +320,44 @@ function initBattleInterface() {
     });
 }
 
+// 離開戰鬥 / 取消配對
+window.leaveBattle = async () => {
+    // 1. 停止監聽
+    if (battleUnsub) { 
+        battleUnsub(); 
+        battleUnsub = null; 
+    }
+
+    // 2. 如果是房主且還在等待中，刪除房間 (避免幽靈房間)
+    if (currentRoomId && myBattleRole === 'host') {
+        try {
+            const roomRef = doc(db, "pvp_rooms", currentRoomId);
+            const snap = await getDoc(roomRef);
+            // 只有在 "waiting" 狀態才刪除，避免戰鬥中誤刪
+            if (snap.exists() && snap.data().status === 'waiting') {
+                await deleteDoc(roomRef);
+                console.log("已取消配對，房間刪除");
+            }
+        } catch (e) {
+            console.error("清理房間失敗:", e);
+        }
+    }
+
+    // 3. 重置狀態
+    currentRoomId = null;
+    myBattleRole = null;
+    
+    // 4. 重置按鈕狀態 (備戰室按鈕)
+    const btn = document.getElementById('btn-battle-ready');
+    if(btn) {
+        btn.innerText = "準備就緒";
+        btn.disabled = false;
+    }
+
+    // 5. 返回首頁
+    switchToPage('page-home');
+};
+
 function updateBattleDisplay(data, side, fallback) {
     const info = data || fallback;
     if (!info) return;
