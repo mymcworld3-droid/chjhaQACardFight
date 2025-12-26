@@ -12,8 +12,8 @@
 
     <header class="absolute top-0 w-full z-20 p-4 flex justify-between items-start pointer-events-none">
         <div class="pointer-events-auto flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-4 rounded-full border border-slate-700">
-            <div id="header-avatar" class="w-10 h-10 rounded-full bg-slate-800 border-2 border-yellow-500 overflow-hidden">
-                <i class="fa-solid fa-user text-gray-400 mt-2 ml-2.5"></i>
+            <div id="header-avatar" class="w-10 h-10 rounded-full bg-slate-800 border-2 border-yellow-500 overflow-hidden relative">
+                <i class="fa-solid fa-user absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
             <div>
                 <div class="text-xs font-bold text-yellow-400" id="header-name">Guest</div>
@@ -33,7 +33,7 @@
         </div>
     </header>
 
-    <main class="flex-1 relative overflow-hidden">
+    <main class="flex-1 relative overflow-hidden w-full h-full">
         
         <div id="login-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950">
             <div class="relative mb-10">
@@ -51,9 +51,9 @@
             <div class="absolute inset-0 opacity-30">
                 <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=2070&auto=format&fit=crop" class="w-full h-full object-cover grayscale">
             </div>
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
 
-            <div class="absolute inset-0 flex items-center justify-center z-0 pt-20">
+            <div class="absolute inset-0 flex items-center justify-center z-0 pt-10">
                 <div id="home-hero-display" class="relative w-64 h-96 bg-slate-800/50 border border-slate-600 rounded-xl flex items-center justify-center text-slate-500">
                     <div class="text-center">
                         <i class="fa-solid fa-user-secret text-6xl mb-4"></i>
@@ -74,11 +74,12 @@
             </div>
         </div>
 
-        <div id="page-adventure" class="page-section hidden h-full w-full bg-slate-900 p-6 pt-20 overflow-y-auto">
+        <div id="page-adventure" class="page-section hidden h-full w-full bg-slate-900 p-6 pt-24 overflow-y-auto">
             <div class="max-w-md mx-auto">
                 <div id="quiz-loading" class="text-center py-20 hidden">
                     <div class="loader mx-auto mb-4"></div>
                     <p class="text-gray-400 text-sm">搜尋魔物知識中...</p>
+                    <p class="text-xs text-red-400 mt-2 hidden" id="quiz-error-msg">無法連接伺服器，請檢查後端是否開啟</p>
                 </div>
 
                 <div id="quiz-container" class="hidden">
@@ -92,8 +93,7 @@
                         <h3 class="text-lg font-bold leading-relaxed" id="question-text">...</h3>
                     </div>
 
-                    <div id="options-container" class="space-y-3">
-                        </div>
+                    <div id="options-container" class="space-y-3"></div>
                 </div>
 
                 <div id="quiz-feedback" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onclick="this.classList.add('hidden'); nextQuestion()">
@@ -107,8 +107,8 @@
             </div>
         </div>
 
-        <div id="page-gacha" class="page-section hidden h-full w-full bg-slate-900 pt-16 overflow-y-auto pb-24">
-            <div class="relative h-64 bg-slate-800 rounded-b-[3rem] overflow-hidden shadow-2xl mb-6 flex-shrink-0">
+        <div id="page-gacha" class="page-section hidden h-full w-full bg-slate-900 pt-20 overflow-y-auto pb-24">
+            <div class="relative h-64 bg-slate-800 rounded-b-[3rem] overflow-hidden shadow-2xl mb-6 flex-shrink-0 mx-[-1rem] md:mx-0">
                 <div class="absolute inset-0 bg-gradient-to-b from-purple-900/50 to-slate-900"></div>
                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-purple-500/20 blur-3xl rounded-full animate-pulse"></div>
                 <div class="relative z-10 flex flex-col items-center justify-center h-full text-center">
@@ -137,7 +137,7 @@
             </div>
         </div>
 
-        <div id="page-deck" class="page-section hidden h-full w-full bg-slate-900 pt-20 p-4 pb-24 overflow-y-auto">
+        <div id="page-deck" class="page-section hidden h-full w-full bg-slate-900 pt-24 p-4 pb-24 overflow-y-auto">
             <div class="flex justify-between items-end mb-4 px-2">
                 <h2 class="text-2xl font-bold text-white"><i class="fa-solid fa-book-journal-whills text-gray-500 mr-2"></i>英靈殿</h2>
                 <span class="text-xs text-gray-400">總數: <span id="deck-count" class="text-white">0</span></span>
@@ -149,16 +149,14 @@
                 <button onclick="renderDeck('SR')" class="bg-purple-900/40 text-purple-400 border border-purple-700/50 px-4 py-1.5 rounded-full text-xs whitespace-nowrap active:bg-purple-900/60">SR</button>
             </div>
 
-            <div id="deck-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                </div>
+            <div id="deck-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20"></div>
         </div>
 
         <div id="gacha-result-overlay" class="fixed inset-0 z-[100] bg-black/95 hidden flex flex-col items-center justify-center p-4">
             <div id="gacha-animation" class="hidden text-6xl text-white animate-bounce mb-8">
                 <i class="fa-solid fa-star text-yellow-400 shadow-2xl shadow-yellow-500"></i>
             </div>
-            <div id="gacha-cards-container" class="grid grid-cols-2 md:grid-cols-5 gap-4 w-full max-w-4xl overflow-y-auto max-h-[80vh] p-2 perspective-1000">
-                </div>
+            <div id="gacha-cards-container" class="grid grid-cols-2 md:grid-cols-5 gap-4 w-full max-w-4xl overflow-y-auto max-h-[80vh] p-2 perspective-1000"></div>
             <button onclick="closeGachaResult()" class="mt-8 bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full backdrop-blur border border-white/20">
                 收下 (Tap to Close)
             </button>
@@ -166,8 +164,8 @@
 
     </main>
 
-    <nav id="bottom-nav" class="bg-slate-950/90 backdrop-blur-md border-t border-slate-800 fixed bottom-0 w-full z-40 hidden pb-safe">
-        <div class="grid h-16 grid-cols-4 mx-auto font-medium" id="nav-grid">
+    <nav id="bottom-nav" class="bg-slate-950/90 backdrop-blur-md border-t border-slate-800 fixed bottom-0 w-full z-40 hidden pb-4 pt-2">
+        <div class="grid h-14 grid-cols-4 mx-auto font-medium" id="nav-grid">
             <button onclick="switchToPage('page-home')" class="nav-btn flex flex-col items-center justify-center text-gray-500 hover:text-white transition group active" data-target="page-home">
                 <i class="fa-solid fa-house mb-1 text-lg group-hover:text-blue-400"></i><span class="text-[10px]">大廳</span>
             </button>
@@ -182,8 +180,6 @@
             </button>
         </div>
     </nav>
-
-    <div id="toast-container" class="fixed top-20 right-4 z-[100] flex flex-col gap-2 w-72 pointer-events-none *:pointer-events-auto"></div>
 
     <script type="module" src="main.js"></script>
 </body>
