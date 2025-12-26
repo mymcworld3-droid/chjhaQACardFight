@@ -158,25 +158,36 @@
         </div>
         <div id="page-battle-setup" class="page-section hidden h-full w-full bg-slate-900 pt-20 p-4 pb-20 overflow-y-auto">
             <h2 class="text-2xl font-bold text-red-400 mb-2">配置出戰陣容</h2>
-            <p class="text-xs text-gray-400 mb-6">主卡決定血量與攻擊，副卡提供支援特性</p>
+            <p class="text-xs text-gray-400 mb-6">主卡決定戰力與技能，副卡提供被動支援</p>
 
             <div class="flex justify-center gap-4 mb-8">
                 <div class="flex flex-col items-center gap-2">
                     <span class="text-xs text-yellow-400 font-bold">👑 主卡 (Main)</span>
-                    <div id="setup-slot-main" onclick="openCardSelector('main')" class="card-slot cursor-pointer hover:border-yellow-400">
-                        點擊選擇
+                    <div id="setup-slot-main" onclick="openCardSelector('main')" class="w-24 h-32 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-yellow-400 bg-slate-800 transition">
+                        <i class="fa-solid fa-plus text-2xl text-gray-500"></i>
+                        <span class="text-[10px] text-gray-400 mt-2">選擇主將</span>
                     </div>
                 </div>
                 <div class="flex flex-col items-center gap-2">
                     <span class="text-xs text-blue-400 font-bold">🛡️ 副卡 (Sub)</span>
-                    <div id="setup-slot-sub" onclick="openCardSelector('sub')" class="card-slot cursor-pointer hover:border-blue-400">
-                        點擊選擇
+                    <div id="setup-slot-sub" onclick="openCardSelector('sub')" class="w-24 h-32 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 bg-slate-800 transition">
+                        <i class="fa-solid fa-plus text-2xl text-gray-500"></i>
+                        <span class="text-[10px] text-gray-400 mt-2">選擇副官</span>
                     </div>
                 </div>
             </div>
 
-            <button onclick="confirmBattleDeck()" id="btn-battle-ready" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-4 rounded-xl shadow-lg opacity-50 cursor-not-allowed" disabled>
-                準備就緒
+            <div id="setup-stats-preview" class="bg-slate-800 p-4 rounded-xl mb-8 border border-slate-700 hidden">
+                <h3 class="text-sm font-bold text-white mb-2">隊伍預覽</h3>
+                <div class="flex justify-between text-xs text-gray-300">
+                    <span><i class="fa-solid fa-heart text-green-400"></i> 生命: <span id="preview-hp">0</span></span>
+                    <span><i class="fa-solid fa-khanda text-red-400"></i> 攻擊: <span id="preview-atk">0</span></span>
+                </div>
+                <div class="mt-2 text-[10px] text-blue-300" id="preview-skills"></div>
+            </div>
+
+            <button onclick="confirmBattleDeck()" id="btn-battle-ready" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-4 rounded-xl shadow-lg opacity-50 cursor-not-allowed transition" disabled>
+                準備就緒 (尋找對手)
             </button>
 
             <div id="selector-modal" class="fixed inset-0 z-50 bg-black/90 hidden flex flex-col p-4">
@@ -191,7 +202,9 @@
         <div id="page-battle-arena" class="page-section hidden h-full w-full bg-slate-950 pt-16 p-4 relative">
             <div class="flex justify-between items-start mb-6">
                 <div class="flex flex-col items-center">
-                    <div class="battle-avatar bg-slate-800" id="enemy-avatar-display"></div>
+                    <div class="w-14 h-14 rounded-full bg-slate-800 border-2 border-red-500 flex items-center justify-center overflow-hidden">
+                        <i class="fa-solid fa-user-secret text-2xl text-red-400"></i>
+                    </div>
                     <div class="text-xs text-red-400 font-bold mt-1">敵方</div>
                 </div>
                 <div class="flex-1 px-4">
@@ -199,47 +212,55 @@
                         <span id="enemy-name">Waiting...</span>
                         <span id="enemy-hp-text">1000/1000</span>
                     </div>
-                    <div class="hp-bar-container"><div id="enemy-hp-bar" class="hp-bar-fill"></div></div>
-                    <div class="flex gap-2 justify-end mt-2">
-                        <div id="enemy-card-main" class="w-10 h-14 bg-slate-800 border border-red-500/50 rounded"></div>
-                        <div id="enemy-card-sub" class="w-8 h-12 bg-slate-800 border border-blue-500/50 rounded mt-2"></div>
+                    <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="enemy-hp-bar" class="h-full bg-red-500 transition-all duration-500" style="width: 100%"></div>
+                    </div>
+                    <div class="flex gap-2 justify-end mt-2 opacity-80">
+                        <div id="enemy-card-main" class="w-8 h-10 bg-slate-700 rounded border border-red-500/30"></div>
+                        <div id="enemy-card-sub" class="w-6 h-8 bg-slate-700 rounded border border-blue-500/30 mt-2"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-20 pointer-events-none">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-10 pointer-events-none">
                 <span class="text-9xl font-black text-white italic">VS</span>
+            </div>
+
+            <div id="battle-log-area" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full text-center z-10 pointer-events-none">
+                <div id="battle-status-msg" class="text-2xl font-black text-white drop-shadow-md animate-pulse">
+                    等待對手...
+                </div>
+                <div id="battle-damage-text" class="text-4xl font-black text-red-500 hidden mt-2"></div>
             </div>
 
             <div class="flex justify-between items-end mt-auto mb-20">
                 <div class="flex-1 px-4">
                     <div class="flex gap-2 mb-2">
-                        <div id="my-card-main" class="w-12 h-16 bg-slate-800 border border-yellow-500 rounded relative group">
-                            <div class="hidden group-hover:block absolute bottom-full left-0 bg-black/80 text-[10px] p-2 rounded w-32 mb-1 z-20" id="my-skill-tooltip">...</div>
-                        </div>
-                        <div id="my-card-sub" class="w-10 h-14 bg-slate-800 border border-blue-500 rounded mt-2"></div>
+                        <div id="my-card-main" class="w-12 h-16 bg-slate-800 border border-yellow-500 rounded relative group overflow-hidden">
+                            </div>
+                        <div id="my-card-sub" class="w-10 h-14 bg-slate-800 border border-blue-500 rounded mt-2 overflow-hidden"></div>
                     </div>
                     <div class="flex justify-between text-xs text-gray-400 mb-1">
                         <span id="my-name">Me</span>
                         <span id="my-hp-text">1000/1000</span>
                     </div>
-                    <div class="hp-bar-container"><div id="my-hp-bar" class="hp-bar-fill bg-gradient-to-r from-green-500 to-emerald-400"></div></div>
+                    <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="my-hp-bar" class="h-full bg-green-500 transition-all duration-500" style="width: 100%"></div>
+                    </div>
                 </div>
                 <div class="flex flex-col items-center">
-                    <div class="battle-avatar bg-slate-800" id="my-avatar-display"></div>
+                    <div class="w-14 h-14 rounded-full bg-slate-800 border-2 border-green-500 flex items-center justify-center overflow-hidden">
+                        <div id="my-avatar-display" class="w-full h-full flex items-center justify-center"></div>
+                    </div>
                     <div class="text-xs text-green-400 font-bold mt-1">我方</div>
                 </div>
             </div>
 
-            <div id="battle-layer" class="absolute inset-0 bg-black/80 z-20 flex flex-col justify-center p-6 hidden">
-                <div id="battle-status-msg" class="text-center text-2xl font-bold text-white mb-6 animate-pulse"></div>
-                
-                <div id="battle-quiz-box" class="hidden">
-                    <div class="bg-slate-800 border-2 border-blue-500 p-4 rounded-xl mb-4 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
-                        <h3 class="text-white font-bold" id="battle-q-text">...</h3>
-                    </div>
-                    <div id="battle-options" class="space-y-3"></div>
+            <div id="battle-quiz-layer" class="absolute inset-0 bg-black/90 z-20 flex flex-col justify-center p-6 hidden">
+                <div class="bg-slate-800 border-l-4 border-blue-500 p-4 rounded-r-xl mb-6 shadow-2xl">
+                    <h3 class="text-white font-bold leading-relaxed" id="battle-q-text">...</h3>
                 </div>
+                <div id="battle-options" class="space-y-3"></div>
             </div>
         </div>
 
