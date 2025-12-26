@@ -127,3 +127,64 @@ body {
 .nav-btn.active span {
     color: white;
 }
+/* ==================
+   ⚔️ 對戰專用樣式
+   ================== */
+.battle-avatar {
+    width: 60px; height: 60px; border-radius: 50%;
+    border: 3px solid #fff; overflow: hidden;
+    position: relative; z-index: 10;
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+}
+
+.hp-bar-container {
+    width: 100%; height: 12px;
+    background: #334155; border-radius: 6px;
+    overflow: hidden; margin-top: 4px;
+    border: 1px solid #475569;
+}
+
+.hp-bar-fill {
+    height: 100%; background: linear-gradient(90deg, #ef4444, #f87171);
+    width: 100%; transition: width 0.5s ease-out;
+}
+
+.card-slot {
+    width: 80px; height: 110px;
+    background: rgba(0,0,0,0.3);
+    border: 2px dashed #475569;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #94a3b8;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.card-slot.filled {
+    border: 2px solid #f59e0b;
+    background: #1e293b;
+}
+
+/* 傷害跳字特效 */
+@keyframes float-up {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    50% { transform: translateY(-30px) scale(1.5); opacity: 1; }
+    100% { transform: translateY(-50px) scale(1); opacity: 0; }
+}
+.damage-text {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem; font-weight: 900;
+    color: #ef4444; text-shadow: 2px 2px 0 #000;
+    pointer-events: none; z-index: 100;
+    animation: float-up 1s ease-out forwards;
+}
+
+.skill-trigger {
+    animation: flash-skill 0.5s ease-out;
+}
+@keyframes flash-skill {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    50% { box-shadow: 0 0 20px 10px rgba(59, 130, 246, 0.8); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
