@@ -277,16 +277,25 @@ window.confirmBattleDeck = async () => {
         if (availableRooms.length > 0) {
             // 找到對手的房間，加入
             const roomDoc = availableRooms[0];
+            console.log('[Guest] 找到房間:', roomDoc.id, '準備加入...');
+            
             await updateDoc(doc(db, "pvp_rooms", roomDoc.id), {
                 guest: myBattleData,
                 status: "battle",
                 turn: 1,
                 attacker: Math.random() < 0.5 ? 'host' : 'guest'
             });
+            
             currentRoomId = roomDoc.id;
             myBattleRole = 'guest';
+            
+            console.log('✅ [Guest] 成功加入房間，進入戰鬥介面');
             showToast('✅ 找到對手！', 'success');
-            initBattleInterface();
+            
+            // 延遲進入戰鬥
+            setTimeout(() => {
+                initBattleInterface();
+            }, 500);
             return;
         }
 
@@ -316,14 +325,24 @@ window.confirmBattleDeck = async () => {
         battleUnsub = onSnapshot(doc(db, "pvp_rooms", currentRoomId), (docSnap) => {
             if (!docSnap.exists()) {
                 clearTimeout(matchTimeout);
+                showToast('❌ 房間已關閉', 'error');
+                leaveBattle(true);
                 return;
             }
             
             const data = docSnap.data();
-            if (data.status === 'battle' && data.guest) {
+            console.log('[Host Waiting] Room Status:', data.status, 'Has Guest:', !!data.guest);
+            
+            // 檢查對手是否加入
+            if (data.status === 'battle' && data.guest && data.guest.uid) {
                 clearTimeout(matchTimeout);
+                console.log('✅ 對手已加入，進入戰鬥！');
                 showToast('⚔️ 對手已加入！', 'success');
-                initBattleInterface();
+                
+                // 延遲一下再進入戰鬥介面，讓 Toast 顯示出來
+                setTimeout(() => {
+                    initBattleInterface();
+                }, 500);
             }
         });
 
