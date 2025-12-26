@@ -249,13 +249,20 @@ async function fillQuizBuffer() {
 
 function renderNextQuestion() {
     if (quizBuffer.length === 0) {
-        // 如果還是空的，可能伺服器很慢或掛了
+        fillQuizBuffer(); // 觸發補充
         return; 
     }
 
-    const quiz = quizBuffer.shift();
+    // 🔥 從緩衝區取出新題目，並存入 currentActiveQuiz
+    currentActiveQuiz = quizBuffer.shift();
     fillQuizBuffer(); // 背景補貨
 
+    // 渲染畫面
+    renderQuizToDOM(currentActiveQuiz);
+}
+
+// 🔥 新增：專門負責把題目畫到螢幕上的函式
+function renderQuizToDOM(quiz) {
     document.getElementById('quiz-loading').classList.add('hidden');
     document.getElementById('quiz-container').classList.remove('hidden');
     document.getElementById('quiz-feedback').classList.add('hidden');
@@ -308,7 +315,10 @@ window.nextQuestion = () => {
 };
 
 window.giveUpQuiz = () => {
-    switchToPage('page-home');
+    if(confirm("確定要撤退嗎？這題將會被跳過。")) {
+        currentActiveQuiz = null; // 🔥 清空當前題目
+        switchToPage('page-home');
+    }
 };
 
 // ==========================================
