@@ -63,17 +63,14 @@
             </div>
 
             <div class="absolute bottom-24 w-full px-6 flex justify-center gap-4 z-10">
-                <button onclick="startAdventure()" class="flex-1 bg-gradient-to-r from-red-600 to-orange-600 hover:brightness-110 text-white py-4 rounded-xl font-black shadow-lg border border-orange-400/30 active:scale-95 transition flex flex-col items-center gap-1 group">
-                    <i class="fa-solid fa-dungeon text-2xl group-hover:animate-bounce"></i>
-                    <span>討伐 (賺金幣)</span>
+                <button onclick="startAdventure()" class="flex-1 bg-slate-800/80 hover:bg-slate-700 text-white py-3 rounded-xl border border-slate-600 backdrop-blur flex flex-col items-center justify-center active:scale-95 transition">
+                    <i class="fa-solid fa-dungeon text-red-400 mb-1"></i> <span class="text-xs">討伐</span>
                 </button>
-                <button onclick="startPvpMatchmaking()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white py-4 rounded-xl font-black shadow-lg border border-indigo-400/30 active:scale-95 transition flex flex-col items-center gap-1 group">
-                    <i class="fa-solid fa-swords text-2xl group-hover:animate-ping"></i>
-                    <span>英靈對戰 (PVP)</span>
+                <button onclick="startPvpMatchmaking()" class="flex-[1.5] bg-gradient-to-r from-red-600 to-orange-600 hover:brightness-110 text-white py-4 rounded-xl font-black shadow-lg shadow-orange-900/20 active:scale-95 transition flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-swords text-2xl mb-1 animate-pulse"></i> <span>英靈對戰</span>
                 </button>
-                <button onclick="switchToPage('page-gacha')" class="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:brightness-110 text-white py-4 rounded-xl font-black shadow-lg border border-cyan-400/30 active:scale-95 transition flex flex-col items-center gap-1 group">
-                    <i class="fa-solid fa-circle-nodes text-2xl group-hover:animate-spin"></i>
-                    <span>召喚</span>
+                <button onclick="switchToPage('page-gacha')" class="flex-1 bg-slate-800/80 hover:bg-slate-700 text-white py-3 rounded-xl border border-slate-600 backdrop-blur flex flex-col items-center justify-center active:scale-95 transition">
+                    <i class="fa-solid fa-gem text-cyan-400 mb-1"></i> <span class="text-xs">召喚</span>
                 </button>
             </div>
         </div>
@@ -156,6 +153,7 @@
 
             <div id="deck-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20"></div>
         </div>
+
         <div id="page-battle-setup" class="page-section hidden h-full w-full bg-slate-900 pt-20 p-4 pb-20 overflow-y-auto">
             <h2 class="text-2xl font-bold text-red-400 mb-2">配置出戰陣容</h2>
             <p class="text-xs text-gray-400 mb-6">主卡決定戰力與技能，副卡提供被動支援</p>
@@ -188,6 +186,10 @@
 
             <button onclick="confirmBattleDeck()" id="btn-battle-ready" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold py-4 rounded-xl shadow-lg opacity-50 cursor-not-allowed transition" disabled>
                 準備就緒 (尋找對手)
+            </button>
+            
+            <button onclick="leaveBattle()" id="btn-battle-cancel" class="w-full mt-3 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl border border-slate-600 transition hidden">
+                取消配對
             </button>
 
             <div id="selector-modal" class="fixed inset-0 z-50 bg-black/90 hidden flex flex-col p-4">
@@ -230,14 +232,15 @@
                 <div id="battle-status-msg" class="text-2xl font-black text-white drop-shadow-md animate-pulse">
                     等待對手...
                 </div>
-                <div id="battle-damage-text" class="text-4xl font-black text-red-500 hidden mt-2"></div>
+                <div id="battle-damage-text" class="text-5xl font-black text-red-500 hidden mt-4 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] transition-all"></div>
             </div>
 
             <div class="flex justify-between items-end mt-auto mb-20">
                 <div class="flex-1 px-4">
                     <div class="flex gap-2 mb-2">
                         <div id="my-card-main" class="w-12 h-16 bg-slate-800 border border-yellow-500 rounded relative group overflow-hidden">
-                            </div>
+                            <div class="hidden group-hover:block absolute bottom-full left-0 bg-black/80 text-[10px] p-2 rounded w-32 mb-1 z-20" id="my-skill-tooltip">...</div>
+                        </div>
                         <div id="my-card-sub" class="w-10 h-14 bg-slate-800 border border-blue-500 rounded mt-2 overflow-hidden"></div>
                     </div>
                     <div class="flex justify-between text-xs text-gray-400 mb-1">
@@ -282,12 +285,10 @@
 
                 <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
                     <label class="block text-xs text-gray-400 mb-2 uppercase tracking-wide">個人特質</label>
-                    
                     <div class="mb-4">
                         <span class="text-xs text-green-400 block mb-1">擅長科目 (Strong)</span>
                         <input type="text" id="set-strong" placeholder="例如: 歷史, 英文" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-green-500">
                     </div>
-
                     <div>
                         <span class="text-xs text-red-400 block mb-1">弱項科目 (Weak)</span>
                         <input type="text" id="set-weak" placeholder="例如: 數學, 理化" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-red-500">
@@ -344,6 +345,8 @@
             </button>
         </div>
     </nav>
+
+    <div id="toast-container" class="fixed top-20 right-4 z-[100] flex flex-col gap-2 w-72 pointer-events-none *:pointer-events-auto"></div>
 
     <script type="module" src="main.js"></script>
 </body>
