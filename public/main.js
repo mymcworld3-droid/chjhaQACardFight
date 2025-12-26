@@ -653,7 +653,7 @@ function renderQuizToDOM(quiz) {
     document.getElementById('quiz-feedback').classList.add('hidden');
 
     document.getElementById('question-text').innerText = quiz.q;
-    document.getElementById('quiz-target-subject').innerText = `目標：${quiz.subject || '未知領域'}`;
+    // document.getElementById('quiz-target-subject').innerText = `目標：${quiz.subject || '未知領域'}`;
     
     const container = document.getElementById('options-container');
     container.innerHTML = '';
