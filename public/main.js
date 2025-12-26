@@ -428,50 +428,114 @@ async function resolveTurn(room) {
     const host = room.host;
     const guest = room.guest;
     
+    // 1. 決定攻擊順序 (先攻者先結算)
+    // room.attacker 記錄的是這一回合誰先攻
     const firstRole = room.attacker;
     const secondRole = room.attacker === 'host' ? 'guest' : 'host';
+
     const first = room[firstRole];
     const second = room[secondRole];
 
     let newHostHp = host.hp;
     let newGuestHp = guest.hp;
-    let damageDealt = 0;
+    
+    // 用來記錄最後一次造成的傷害，讓前端顯示跳字
+    let lastDamageDealt = 0; 
+    let logMsg = "";
 
-    // 1. 先手攻擊
-    if (first.answer === 'correct') {
-        const dmg = Math.floor(first.atk * (first.mainCard.skill.type === 'atk' ? first.mainCard.skill.val : 1));
-        if (firstRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
-        damageDealt = dmg;
+    // --- 內部小函式：計算單次行動的結果 ---
+    const calculateAction = (attacker, roleIsHost) => {
+        let dmg = 0;
+        let heal = 0;
         
-        if (first.mainCard.skill.type === 'heal') {
-            const heal = Math.floor(first.maxHp * first.mainCard.skill.val);
-            if (firstRole === 'host') newHostHp += heal; else newGuestHp += heal;
+        const skill = attacker.mainCard.skill;
+        const skillType = skill.type; // 'atk', 'heal', 'mix'
+        const skillVal = skill.val;   // 倍率
+
+        // A. 計算傷害 (攻擊型 或 混合型)
+        if (skillType === 'atk' || skillType === 'mix') {
+            const multiplier = skillVal;
+            dmg = Math.floor(attacker.atk * multiplier);
+        } else {
+            // 純補師普攻 (無倍率)
+            dmg = attacker.atk;
         }
+
+        // B. 計算回復 (回復型 或 混合型)
+        if (skillType === 'heal' || skillType === 'mix') {
+            // 如果是混合型(mix)，回復量固定為 10% (0.1)，否則使用 skillVal
+            const healRate = (skillType === 'mix') ? 0.1 : skillVal;
+            heal = Math.floor(attacker.maxHp * healRate);
+        }
+
+        return { dmg, heal };
+    };
+
+    // --- 第一順位行動 ---
+    if (first.answer === 'correct') {
+        const action = calculateAction(first, firstRole === 'host');
+        
+        // 1. 造成傷害 (扣對手的血)
+        if (firstRole === 'host') newGuestHp -= action.dmg;
+        else newHostHp -= action.dmg;
+        
+        // 2. 自身回復 (加自己的血，不能超過上限)
+        if (action.heal > 0) {
+            if (firstRole === 'host') newHostHp = Math.min(host.maxHp, newHostHp + action.heal);
+            else newGuestHp = Math.min(guest.maxHp, newGuestHp + action.heal);
+        }
+
+        lastDamageDealt = action.dmg;
+        logMsg += `${first.name} 發動技能！造成 ${action.dmg} 傷害。\n`;
+    } else {
+        logMsg += `${first.name} 答錯了，錯失良機。\n`;
     }
 
-    // 2. 後手攻擊 (如果還活著)
+    // --- 第二順位行動 (反擊) ---
+    // ⚠️ 只有在雙方都還活著的情況下，後手才能反擊
     if (newHostHp > 0 && newGuestHp > 0) {
         if (second.answer === 'correct') {
-            const dmg = Math.floor(second.atk * (second.mainCard.skill.type === 'atk' ? second.mainCard.skill.val : 1));
-            if (secondRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
-            // 簡化：只顯示先手傷害或最後一次傷害
-             damageDealt = dmg; 
+            const action = calculateAction(second, secondRole === 'host');
+
+            // 1. 造成傷害
+            if (secondRole === 'host') newGuestHp -= action.dmg;
+            else newHostHp -= action.dmg;
+
+            // 2. 自身回復
+            if (action.heal > 0) {
+                if (secondRole === 'host') newHostHp = Math.min(host.maxHp, newHostHp + action.heal);
+                else newGuestHp = Math.min(guest.maxHp, newGuestHp + action.heal);
+            }
+
+            // 更新最後傷害顯示 (或者你可以選擇累加，這裡為了顯示反擊效果，覆蓋為反擊傷害)
+            if (action.dmg > 0) lastDamageDealt = action.dmg;
+            
+            logMsg += `${second.name} 反擊！造成 ${action.dmg} 傷害。`;
+        } else {
+            logMsg += `${second.name} 答錯了。`;
         }
     }
 
-    // 延遲更新讓前端看動畫
+    // --- 延遲更新資料庫 (讓前端動畫跑一下) ---
     setTimeout(async () => {
-        await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
-            "host.hp": newHostHp,
-            "guest.hp": newGuestHp,
-            "host.answer": null,
-            "guest.answer": null,
-            currentQuestion: null,
-            turn: room.turn + 1,
-            attacker: secondRole,
-            lastLog: { damage: damageDealt } 
-        });
-    }, 2000);
+        try {
+            await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
+                "host.hp": newHostHp,
+                "guest.hp": newGuestHp,
+                "host.answer": null,
+                "guest.answer": null,
+                currentQuestion: null,
+                turn: room.turn + 1,
+                attacker: secondRole, // 交換下一回合先攻
+                lastLog: { 
+                    message: logMsg,
+                    damage: lastDamageDealt // 傳給前端顯示紅色跳字
+                }
+            });
+        } catch (e) {
+            console.error("結算更新失敗:", e);
+        }
+    }, 1500);
 }
 
 function endBattle(isWin) {
