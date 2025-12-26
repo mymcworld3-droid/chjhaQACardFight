@@ -23,14 +23,14 @@ const db = getFirestore();
 const provider = new GoogleAuthProvider();
 
 // ==========================================
-// 🃏 卡牌資料庫 (Card Database) - 升級版
+// 🃏 卡牌資料庫 (Card Database)
 // ==========================================
 const CARD_DB = [
     // SSR (5%)
     { 
         id: 'ssr_001', name: '愛因斯坦', title: '光之物理學家', rarity: 'SSR', type: 'sci', 
         power: 2500, hp: 3000, icon: 'fa-atom',
-        skill: { name: "相對論", desc: "造成 1.5倍 攻擊傷害", type: "atk", val: 1.5 },
+        skill: { name: "相對論衝擊", desc: "造成 1.5倍 攻擊傷害", type: "atk", val: 1.5 },
         subTrait: { name: "光速運算", desc: "主卡攻擊力 +15%", type: "buff_atk", val: 0.15 }
     },
     { 
@@ -126,27 +126,21 @@ onAuthStateChanged(auth, async (user) => {
 // ⚔️ PVP 對戰系統 (Battle Logic)
 // ==========================================
 
-// 1. 開始配對 (進入備戰室)
 window.startPvpMatchmaking = async () => {
     if (!currentUserData.cardInventory.length) return alert("請先去召喚至少一張英靈！");
     
     switchToPage('page-battle-setup');
-    // 重置選卡狀態
     selectedDeck = { main: null, sub: null };
     updateSetupUI();
 };
 
-// 2. 選擇卡牌
 window.openCardSelector = (slot) => {
     const modal = document.getElementById('selector-modal');
     const grid = document.getElementById('selector-grid');
     modal.classList.remove('hidden');
     grid.innerHTML = '';
 
-    // 顯示擁有的卡片
     const cards = currentUserData.cardInventory.map(c => ({...c, data: CARD_DB.find(db => db.id === c.cardId)})).filter(c=>c.data);
-    
-    // 排序
     cards.sort((a, b) => b.data.power - a.data.power);
 
     cards.forEach(c => {
@@ -166,29 +160,30 @@ function updateSetupUI() {
     const mainSlot = document.getElementById('setup-slot-main');
     const subSlot = document.getElementById('setup-slot-sub');
     const btn = document.getElementById('btn-battle-ready');
+    const cancelBtn = document.getElementById('btn-battle-cancel');
     const previewDiv = document.getElementById('setup-stats-preview');
 
-    // 渲染主卡槽
+    // 重置按鈕狀態
+    btn.classList.remove('hidden');
+    cancelBtn.classList.add('hidden');
+
     if (selectedDeck.main) {
         mainSlot.innerHTML = renderCardHTML(selectedDeck.main);
         mainSlot.classList.remove('border-dashed');
         mainSlot.className = `w-24 h-32 rounded-xl overflow-hidden shadow-lg border-2 rarity-${selectedDeck.main.rarity}`;
     }
 
-    // 渲染副卡槽
     if (selectedDeck.sub) {
         subSlot.innerHTML = renderCardHTML(selectedDeck.sub);
         subSlot.classList.remove('border-dashed');
         subSlot.className = `w-24 h-32 rounded-xl overflow-hidden shadow-lg border-2 rarity-${selectedDeck.sub.rarity}`;
     }
 
-    // 計算預覽數值
     if (selectedDeck.main && selectedDeck.sub) {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         previewDiv.classList.remove('hidden');
 
-        // 計算特性加成
         let finalHp = selectedDeck.main.hp;
         let finalAtk = selectedDeck.main.power;
         const sub = selectedDeck.sub;
@@ -209,11 +204,13 @@ function updateSetupUI() {
     }
 }
 
-// 3. 確認牌組並尋找房間
 window.confirmBattleDeck = async () => {
     const btn = document.getElementById('btn-battle-ready');
-    btn.innerText = "尋找對手中...";
-    btn.disabled = true;
+    const cancelBtn = document.getElementById('btn-battle-cancel');
+    
+    // UI 切換為尋找狀態
+    btn.classList.add('hidden');
+    cancelBtn.classList.remove('hidden');
 
     // 計算戰鬥數據
     const main = selectedDeck.main;
@@ -240,7 +237,7 @@ window.confirmBattleDeck = async () => {
         answer: null
     };
 
-    // 配對邏輯
+    // 配對
     const twoMinAgo = new Date(Date.now() - 120000);
     const q = query(collection(db, "pvp_rooms"), where("status", "==", "waiting"), where("createdAt", ">", twoMinAgo), limit(1));
     const snapshot = await getDocs(q);
@@ -252,7 +249,7 @@ window.confirmBattleDeck = async () => {
                 guest: myBattleData,
                 status: "battle",
                 turn: 1,
-                attacker: Math.random() < 0.5 ? 'host' : 'guest' // 隨機先手
+                attacker: Math.random() < 0.5 ? 'host' : 'guest'
             });
             currentRoomId = roomDoc.id;
             myBattleRole = 'guest';
@@ -271,16 +268,24 @@ window.confirmBattleDeck = async () => {
     });
     currentRoomId = docRef.id;
     myBattleRole = 'host';
-    initBattleInterface();
+    
+    // 監聽房間狀態 (等待對手加入)
+    battleUnsub = onSnapshot(doc(db, "pvp_rooms", currentRoomId), (docSnap) => {
+        if (docSnap.exists() && docSnap.data().status === 'battle') {
+            initBattleInterface();
+        }
+    });
 };
 
-// 4. 戰鬥畫面
 function initBattleInterface() {
     switchToPage('page-battle-arena');
     document.getElementById('battle-quiz-layer').classList.add('hidden');
-    document.getElementById('battle-status-msg').innerText = "等待對手...";
+    document.getElementById('battle-status-msg').innerText = "戰鬥開始!";
+    document.getElementById('battle-damage-text').classList.add('hidden'); // 重置傷害文字
     
-    updateBattleDisplay(null, 'my', {hp: selectedDeck.main.hp, maxHp: selectedDeck.main.hp}); // 初始佔位
+    updateBattleDisplay(null, 'my', {hp: selectedDeck.main.hp, maxHp: selectedDeck.main.hp}); 
+
+    if (battleUnsub) battleUnsub(); // 先清除舊的等待監聽
 
     battleUnsub = onSnapshot(doc(db, "pvp_rooms", currentRoomId), async (docSnap) => {
         if (!docSnap.exists()) return;
@@ -298,13 +303,16 @@ function initBattleInterface() {
             const color = room.attacker === myBattleRole ? "text-green-400" : "text-red-400";
             document.getElementById('battle-status-msg').innerHTML = `第 ${room.turn} 回合<br><span class="text-sm text-gray-400">先攻: <span class="${color}">${attackerName}</span></span>`;
 
-            // 判斷勝負
+            // 顯示傷害特效 (如果有 Last Log)
+            if (room.lastLog && room.lastLog.damage > 0) {
+                 showDamagePopup(room.lastLog.damage);
+            }
+
             if (me.hp <= 0 || enemy.hp <= 0) {
                 endBattle(me.hp > 0);
                 return;
             }
 
-            // 流程: Host 發題 -> 雙方顯示 -> 雙方作答 -> Host 結算
             if (!room.currentQuestion) {
                 if (myBattleRole === 'host') await generateBattleQuestion(currentRoomId);
             } else if (me.answer === null) {
@@ -321,41 +329,35 @@ function initBattleInterface() {
 }
 
 // 離開戰鬥 / 取消配對
-window.leaveBattle = async () => {
-    // 1. 停止監聽
+window.leaveBattle = async (navigate = true) => {
     if (battleUnsub) { 
         battleUnsub(); 
         battleUnsub = null; 
     }
 
-    // 2. 如果是房主且還在等待中，刪除房間 (避免幽靈房間)
     if (currentRoomId && myBattleRole === 'host') {
         try {
             const roomRef = doc(db, "pvp_rooms", currentRoomId);
             const snap = await getDoc(roomRef);
-            // 只有在 "waiting" 狀態才刪除，避免戰鬥中誤刪
             if (snap.exists() && snap.data().status === 'waiting') {
                 await deleteDoc(roomRef);
-                console.log("已取消配對，房間刪除");
             }
-        } catch (e) {
-            console.error("清理房間失敗:", e);
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // 3. 重置狀態
     currentRoomId = null;
     myBattleRole = null;
     
-    // 4. 重置按鈕狀態 (備戰室按鈕)
+    // 重置按鈕
     const btn = document.getElementById('btn-battle-ready');
+    const cancelBtn = document.getElementById('btn-battle-cancel');
     if(btn) {
-        btn.innerText = "準備就緒";
+        btn.classList.remove('hidden');
         btn.disabled = false;
+        cancelBtn.classList.add('hidden');
     }
 
-    // 5. 返回首頁
-    switchToPage('page-home');
+    if (navigate) switchToPage('page-home');
 };
 
 function updateBattleDisplay(data, side, fallback) {
@@ -366,20 +368,26 @@ function updateBattleDisplay(data, side, fallback) {
     const bar = document.getElementById(`${side}-hp-bar`);
     bar.style.width = `${Math.max(0, hpPercent)}%`;
     
-    // 血量低變色
     if (hpPercent < 30) bar.className = "h-full bg-red-600 transition-all duration-500 animate-pulse";
     else bar.className = `h-full ${side==='my'?'bg-green-500':'bg-red-500'} transition-all duration-500`;
 
     document.getElementById(`${side}-hp-text`).innerText = `${Math.max(0, info.hp)}/${info.maxHp}`;
     if (data) {
         document.getElementById(`${side}-name`).innerText = data.name;
-        // 渲染卡牌小圖
         const mainDiv = document.getElementById(`${side}-card-main`);
         if(mainDiv.innerHTML === "") {
             mainDiv.innerHTML = `<i class="fa-solid ${data.mainCard.icon} text-2xl text-white/50 flex items-center justify-center h-full"></i>`;
             mainDiv.className = `w-12 h-16 rounded border-2 rarity-${data.mainCard.rarity} bg-slate-800`;
         }
     }
+}
+
+function showDamagePopup(dmg) {
+    const el = document.getElementById('battle-damage-text');
+    el.innerText = `-${dmg}`;
+    el.classList.remove('hidden', 'damage-popup');
+    void el.offsetWidth; // trigger reflow
+    el.classList.add('damage-popup');
 }
 
 async function generateBattleQuestion(roomId) {
@@ -390,7 +398,7 @@ async function generateBattleQuestion(roomId) {
         q = quizBuffer.shift();
     }
     fillQuizBuffer(); 
-    await updateDoc(doc(db, "pvp_rooms", roomId), { currentQuestion: q });
+    await updateDoc(doc(db, "pvp_rooms", roomId), { currentQuestion: q, lastLog: null });
 }
 
 function showBattleQuestion(q) {
@@ -403,10 +411,7 @@ function showBattleQuestion(q) {
         const btn = document.createElement('button');
         btn.className = "w-full text-left p-4 bg-slate-700 hover:bg-slate-600 rounded-xl border border-slate-600 mb-2 font-bold";
         btn.innerText = opt;
-        btn.onclick = () => {
-            const isCorrect = (opt === q.correct);
-            submitBattleAnswer(isCorrect);
-        };
+        btn.onclick = () => submitBattleAnswer(opt === q.correct);
         container.appendChild(btn);
     });
 }
@@ -423,7 +428,6 @@ async function resolveTurn(room) {
     const host = room.host;
     const guest = room.guest;
     
-    // 誰先攻
     const firstRole = room.attacker;
     const secondRole = room.attacker === 'host' ? 'guest' : 'host';
     const first = room[firstRole];
@@ -431,39 +435,43 @@ async function resolveTurn(room) {
 
     let newHostHp = host.hp;
     let newGuestHp = guest.hp;
-    let damageText = "";
+    let damageDealt = 0;
 
-    // 1. 先手攻擊 (如果答對)
+    // 1. 先手攻擊
     if (first.answer === 'correct') {
         const dmg = Math.floor(first.atk * (first.mainCard.skill.type === 'atk' ? first.mainCard.skill.val : 1));
         if (firstRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
-        damageText = `${first.name} 造成 ${dmg} 傷害!`;
+        damageDealt = dmg;
         
-        // 技能回復
         if (first.mainCard.skill.type === 'heal') {
             const heal = Math.floor(first.maxHp * first.mainCard.skill.val);
             if (firstRole === 'host') newHostHp += heal; else newGuestHp += heal;
         }
     }
 
-    // 2. 後手攻擊 (如果還活著且答對)
+    // 2. 後手攻擊 (如果還活著)
     if (newHostHp > 0 && newGuestHp > 0) {
         if (second.answer === 'correct') {
             const dmg = Math.floor(second.atk * (second.mainCard.skill.type === 'atk' ? second.mainCard.skill.val : 1));
             if (secondRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
+            // 簡化：只顯示先手傷害或最後一次傷害
+             damageDealt = dmg; 
         }
     }
 
-    // 更新狀態
-    await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
-        "host.hp": newHostHp,
-        "guest.hp": newGuestHp,
-        "host.answer": null,
-        "guest.answer": null,
-        currentQuestion: null,
-        turn: room.turn + 1,
-        attacker: secondRole // 交換先手
-    });
+    // 延遲更新讓前端看動畫
+    setTimeout(async () => {
+        await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
+            "host.hp": newHostHp,
+            "guest.hp": newGuestHp,
+            "host.answer": null,
+            "guest.answer": null,
+            currentQuestion: null,
+            turn: room.turn + 1,
+            attacker: secondRole,
+            lastLog: { damage: damageDealt } 
+        });
+    }, 2000);
 }
 
 function endBattle(isWin) {
@@ -577,19 +585,12 @@ function renderHomeHero() {
 }
 
 window.switchToPage = (pageId) => {
-    // 🔥 新增：檢測是否離開對戰相關頁面
-    // 如果當前有房間 ID，且目標頁面不是「備戰室」或「競技場」，代表玩家想離開
+    // 離開對戰頁面時的防護
     const isBattlePage = (pageId === 'page-battle-setup' || pageId === 'page-battle-arena');
-    
     if (currentRoomId && !isBattlePage) {
-        // 如果正在戰鬥中，詢問是否中離 (可選)
-        // if (!confirm("正在配對或戰鬥中，確定要離開嗎？")) return; 
-        
-        // 執行離開邏輯 (傳入 false 代表不執行內部跳轉，因為我們正在執行 switchToPage)
         leaveBattle(false);
     }
 
-    // --- 原有邏輯 ---
     document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
     document.getElementById(pageId).classList.remove('hidden');
     
@@ -908,16 +909,13 @@ function getAttrIcon(type) {
     const map = { 'sci': 'fa-flask', 'his': 'fa-scroll', 'art': 'fa-palette', 'war': 'fa-meteor' };
     return map[type] || 'fa-star';
 }
+
 // 瀏覽器關閉/重整時的防護
 window.addEventListener('beforeunload', (e) => {
     if (currentRoomId) {
-        // 嘗試在背景刪除 (不保證成功，但在現代瀏覽器有機會)
-        // 這裡只能做盡力而為的清理
         if (myBattleRole === 'host') {
-            // 使用 Beacon API 或簡單的 fetch 可能無法處理 Firestore auth
-            // 所以這裡主要目的是彈出警告
             e.preventDefault();
-            e.returnValue = ''; // 觸發瀏覽器預設的「確定要離開嗎？」彈窗
+            e.returnValue = ''; 
         }
     }
 });
