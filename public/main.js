@@ -814,7 +814,7 @@ async function fetchOneQuestion() {
         let options = [quizData.correct, ...quizData.wrong];
         options.sort(() => Math.random() - 0.5);
         
-        quizBuffer.push({ ...quizData, options, subject: targetSubject });
+        quizBuffer.push({ ...quizData, options, subject: quizData.subject || targetSubject });
         return true;
     } catch (e) {
         console.error("Fetch Quiz Error:", e);
