@@ -57,6 +57,7 @@ let quizBuffer = [];
 const BUFFER_SIZE = 3;
 let isFetchingQuiz = false;
 let currentLang = 'zh-TW';
+let currentActiveQuiz = null;
 
 // ==========================================
 // 🚀 Auth & Init
@@ -182,6 +183,12 @@ window.switchToPage = (pageId) => {
 window.startAdventure = async () => {
     switchToPage('page-adventure');
     
+    // 🔥 修正邏輯：如果當前已經有題目，直接渲染該題目，不消耗緩衝區
+    if (currentActiveQuiz) {
+        renderQuizToDOM(currentActiveQuiz);
+        return;
+    }
+    
     // 如果緩衝區沒題目，嘗試抓取
     if (quizBuffer.length === 0) {
         document.getElementById('quiz-loading').classList.remove('hidden');
@@ -190,7 +197,6 @@ window.startAdventure = async () => {
         
         const success = await fetchOneQuestion(); 
         if (!success) {
-            // 如果失敗，顯示錯誤並返回
             document.getElementById('quiz-error-msg').classList.remove('hidden');
             setTimeout(() => switchToPage('page-home'), 2000);
             return;
