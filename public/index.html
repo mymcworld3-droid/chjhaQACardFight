@@ -79,7 +79,8 @@
                 <div id="quiz-loading" class="text-center py-20 hidden">
                     <div class="loader mx-auto mb-4"></div>
                     <p class="text-gray-400 text-sm">搜尋魔物知識中...</p>
-                    <p class="text-xs text-red-400 mt-2 hidden" id="quiz-error-msg">無法連接伺服器，請檢查後端是否開啟</p>
+                    <p class="text-xs text-blue-400 mt-2" id="quiz-target-subject">目標：...</p>
+                    <p class="text-xs text-red-400 mt-2 hidden" id="quiz-error-msg">無法連接伺服器</p>
                 </div>
 
                 <div id="quiz-container" class="hidden">
@@ -152,6 +153,55 @@
             <div id="deck-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-20"></div>
         </div>
 
+        <div id="page-settings" class="page-section hidden h-full w-full bg-slate-900 pt-24 p-6 pb-24 overflow-y-auto">
+            <h2 class="text-2xl font-bold mb-6 text-green-400 flex items-center gap-2">
+                <i class="fa-solid fa-gears"></i> 冒險設定
+            </h2>
+
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <label class="block text-xs text-gray-400 mb-2 uppercase tracking-wide">冒險難度 (年級)</label>
+                    <select id="set-level" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-green-500 transition">
+                        <option value="國小">國小 (Elementary)</option>
+                        <option value="國中">國中 (Junior High)</option>
+                        <option value="高中">高中 (Senior High)</option>
+                        <option value="大學">大學/成人 (University)</option>
+                    </select>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <label class="block text-xs text-gray-400 mb-2 uppercase tracking-wide">個人特質</label>
+                    
+                    <div class="mb-4">
+                        <span class="text-xs text-green-400 block mb-1">擅長科目 (Strong)</span>
+                        <input type="text" id="set-strong" placeholder="例如: 歷史, 英文" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-green-500">
+                    </div>
+
+                    <div>
+                        <span class="text-xs text-red-400 block mb-1">弱項科目 (Weak)</span>
+                        <input type="text" id="set-weak" placeholder="例如: 數學, 理化" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-red-500">
+                        <p class="text-[10px] text-gray-500 mt-1">* 系統將優先出弱項題目以提升報酬</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <label class="block text-xs text-gray-400 mb-2 uppercase tracking-wide">出題來源</label>
+                    <select id="set-source" class="w-full bg-slate-900 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-blue-500 transition">
+                        <option value="ai">✨ AI 生成 (無限)</option>
+                        <option value="bank" disabled>📚 題庫 (施工中)</option>
+                    </select>
+                </div>
+
+                <button onclick="saveSettings()" class="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:brightness-110 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> 保存設定
+                </button>
+
+                <button onclick="logout()" class="w-full mt-4 border border-red-500/50 text-red-400 hover:bg-red-500/10 py-3 rounded-xl transition flex justify-center items-center gap-2 text-sm">
+                    <i class="fa-solid fa-right-from-bracket"></i> 登出
+                </button>
+            </div>
+        </div>
+
         <div id="gacha-result-overlay" class="fixed inset-0 z-[100] bg-black/95 hidden flex flex-col items-center justify-center p-4">
             <div id="gacha-animation" class="hidden text-6xl text-white animate-bounce mb-8">
                 <i class="fa-solid fa-star text-yellow-400 shadow-2xl shadow-yellow-500"></i>
@@ -165,7 +215,7 @@
     </main>
 
     <nav id="bottom-nav" class="bg-slate-950/90 backdrop-blur-md border-t border-slate-800 fixed bottom-0 w-full z-40 hidden pb-4 pt-2">
-        <div class="grid h-14 grid-cols-4 mx-auto font-medium" id="nav-grid">
+        <div class="grid h-14 grid-cols-5 mx-auto font-medium" id="nav-grid">
             <button onclick="switchToPage('page-home')" class="nav-btn flex flex-col items-center justify-center text-gray-500 hover:text-white transition group active" data-target="page-home">
                 <i class="fa-solid fa-house mb-1 text-lg group-hover:text-blue-400"></i><span class="text-[10px]">大廳</span>
             </button>
@@ -177,6 +227,9 @@
             </button>
             <button onclick="loadUserDeck(); switchToPage('page-deck')" class="nav-btn flex flex-col items-center justify-center text-gray-500 hover:text-white transition group" data-target="page-deck">
                 <i class="fa-solid fa-layer-group mb-1 text-lg group-hover:text-purple-400"></i><span class="text-[10px]">牌組</span>
+            </button>
+            <button onclick="updateSettingsUI(); switchToPage('page-settings')" class="nav-btn flex flex-col items-center justify-center text-gray-500 hover:text-white transition group" data-target="page-settings">
+                <i class="fa-solid fa-gears mb-1 text-lg group-hover:text-green-400"></i><span class="text-[10px]">設定</span>
             </button>
         </div>
     </nav>
