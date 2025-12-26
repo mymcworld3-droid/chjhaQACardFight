@@ -5,7 +5,7 @@ import {
     serverTimestamp, runTransaction 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Firebase Config (保持不變)
+// Firebase Config
 const firebaseConfig = {
     apiKey: "AIzaSyDifdJmLTmwQATz__xUHSkXZ_xXOWyX-wU",
     authDomain: "question-learning.firebaseapp.com",
@@ -49,13 +49,14 @@ const CARD_DB = [
     { id: 'n_004', name: '吟遊詩人', title: '路人', rarity: 'N', type: 'art', power: 420, icon: 'fa-music' },
 ];
 
-const GACHA_RATES = { SSR: 0.05, SR: 0.20, R: 0.50 }; // N = 1 - 0.5 = 0.5
+const GACHA_RATES = { SSR: 0.05, SR: 0.20, R: 0.50 };
 
 // 狀態變數
 let currentUserData = null;
 let quizBuffer = [];
 const BUFFER_SIZE = 3;
 let isFetchingQuiz = false;
+let currentLang = 'zh-TW';
 
 // ==========================================
 // 🚀 Auth & Init
@@ -74,16 +75,14 @@ onAuthStateChanged(auth, async (user) => {
         
         if (docSnap.exists()) {
             currentUserData = docSnap.data();
-            // 補丁：確保有 cardInventory 欄位
             if (!currentUserData.cardInventory) currentUserData.cardInventory = [];
-            if (!currentUserData.gold) currentUserData.gold = 0; // 改用 gold 代替 score
+            if (!currentUserData.gold && currentUserData.gold !== 0) currentUserData.gold = 500;
         } else {
-            // 新帳號初始化
             currentUserData = {
                 uid: user.uid,
                 displayName: user.displayName,
                 email: user.email,
-                gold: 500, // 初始資金
+                gold: 500, 
                 cardInventory: [], 
                 totalPower: 0,
                 createdAt: serverTimestamp()
@@ -108,23 +107,22 @@ onAuthStateChanged(auth, async (user) => {
 function updateUIHeader() {
     if (!currentUserData) return;
     
-    // 計算總戰力 (Top 5 Cards Power)
+    // 計算總戰力
     const cards = currentUserData.cardInventory.map(c => CARD_DB.find(db => db.id === c.cardId)).filter(Boolean);
     cards.sort((a, b) => b.power - a.power);
     const topPower = cards.slice(0, 5).reduce((sum, c) => sum + c.power, 0);
     
-    currentUserData.totalPower = topPower; // Update local state
+    currentUserData.totalPower = topPower; 
 
     document.getElementById('header-name').innerText = currentUserData.displayName;
     document.getElementById('header-gold').innerText = currentUserData.gold;
     document.getElementById('header-power').innerText = topPower;
-    
-    // 計算等級 (簡易版：戰力/1000)
     const level = Math.floor(topPower / 1000) + 1;
     document.getElementById('header-level').innerText = level;
+    
+    // 同步更新Gacha頁面的金幣 (如果有顯示的話)
 }
 
-// 首頁看板娘 (最強的一張卡)
 function renderHomeHero() {
     const container = document.getElementById('home-hero-display');
     if (!currentUserData.cardInventory || currentUserData.cardInventory.length === 0) {
@@ -134,10 +132,10 @@ function renderHomeHero() {
                 <p class="text-xs">尚無契約英靈</p>
                 <p class="text-[10px] mt-2">快去召喚吧！</p>
             </div>`;
+        container.className = "relative w-64 h-96 bg-slate-800/50 border border-slate-600 rounded-xl flex items-center justify-center text-slate-500";
         return;
     }
 
-    // 找最強卡
     const cards = currentUserData.cardInventory.map(c => CARD_DB.find(db => db.id === c.cardId)).filter(Boolean);
     cards.sort((a, b) => b.power - a.power);
     const hero = cards[0];
@@ -183,11 +181,20 @@ window.switchToPage = (pageId) => {
 // ==========================================
 window.startAdventure = async () => {
     switchToPage('page-adventure');
-    // 如果緩衝區沒題目，先顯示 Loading
+    
+    // 如果緩衝區沒題目，嘗試抓取
     if (quizBuffer.length === 0) {
         document.getElementById('quiz-loading').classList.remove('hidden');
         document.getElementById('quiz-container').classList.add('hidden');
-        await fetchOneQuestion(); // 強制抓一題
+        document.getElementById('quiz-error-msg').classList.add('hidden');
+        
+        const success = await fetchOneQuestion(); 
+        if (!success) {
+            // 如果失敗，顯示錯誤並返回
+            document.getElementById('quiz-error-msg').classList.remove('hidden');
+            setTimeout(() => switchToPage('page-home'), 2000);
+            return;
+        }
     }
     renderNextQuestion();
 };
@@ -195,12 +202,11 @@ window.startAdventure = async () => {
 async function fetchOneQuestion() {
     isFetchingQuiz = true;
     try {
-        // 使用你的後端 API
         const response = await fetch('/api/generate-quiz', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                subject: "History", // 可以隨機換
+                subject: "History", 
                 level: "General", 
                 rank: "Novice", 
                 difficulty: "easy",
@@ -208,18 +214,20 @@ async function fetchOneQuestion() {
             })
         });
         
+        if (!response.ok) throw new Error("Server Error");
+
         const data = await response.json();
-        // 簡單解析 JSON (假設後端回傳格式正確)
         let aiText = data.text.replace(/```json/g, '').replace(/```/g, '').trim();
         const quizData = JSON.parse(aiText);
         
-        // 混淆選項
         let options = [quizData.correct, ...quizData.wrong];
         options.sort(() => Math.random() - 0.5);
         
         quizBuffer.push({ ...quizData, options });
+        return true;
     } catch (e) {
         console.error("Fetch Quiz Error:", e);
+        return false;
     } finally {
         isFetchingQuiz = false;
     }
@@ -227,15 +235,16 @@ async function fetchOneQuestion() {
 
 async function fillQuizBuffer() {
     if (isFetchingQuiz) return;
-    while (quizBuffer.length < BUFFER_SIZE) {
+    // 簡單的背景補充機制
+    if (quizBuffer.length < BUFFER_SIZE) {
         await fetchOneQuestion();
     }
 }
 
 function renderNextQuestion() {
     if (quizBuffer.length === 0) {
-        fillQuizBuffer(); // 觸發補充
-        return; // 等待中
+        // 如果還是空的，可能伺服器很慢或掛了
+        return; 
     }
 
     const quiz = quizBuffer.shift();
@@ -272,7 +281,6 @@ window.handleAdventureAnswer = async (isCorrect) => {
         title.className = "text-3xl font-black mb-2 text-yellow-400";
         reward.innerHTML = "+50 <span class='text-xs'>Gold</span>";
         
-        // 加錢
         currentUserData.gold += 50;
         await updateDoc(doc(db, "users", auth.currentUser.uid), { gold: currentUserData.gold });
         updateUIHeader();
@@ -285,7 +293,12 @@ window.handleAdventureAnswer = async (isCorrect) => {
 };
 
 window.nextQuestion = () => {
-    renderNextQuestion();
+    if (quizBuffer.length > 0) {
+        renderNextQuestion();
+    } else {
+        // 如果沒庫存，重新觸發載入
+        startAdventure();
+    }
 };
 
 window.giveUpQuiz = () => {
@@ -329,12 +342,10 @@ window.performSummon = async (count) => {
         let currentDeck = currentUserData.cardInventory || [];
         const updatedDeck = [...currentDeck, ...pulledCards];
 
-        // Optimistic UI Update
         currentUserData.gold = newGold;
         currentUserData.cardInventory = updatedDeck;
         updateUIHeader();
 
-        // Save to DB
         const userRef = doc(db, "users", auth.currentUser.uid);
         await updateDoc(userRef, {
             gold: newGold,
@@ -364,7 +375,7 @@ function showGachaResults(cards) {
             const cardData = CARD_DB.find(c => c.id === item.cardId);
             const el = document.createElement('div');
             el.className = `card-frame rarity-${cardData.rarity} card-reveal`;
-            el.style.animationDelay = `${idx * 0.15}s`; // 依序翻牌
+            el.style.animationDelay = `${idx * 0.15}s`;
             el.innerHTML = renderCardHTML(cardData);
             container.appendChild(el);
         });
@@ -373,6 +384,10 @@ function showGachaResults(cards) {
 
 window.closeGachaResult = () => {
     document.getElementById('gacha-result-overlay').classList.add('hidden');
+    // 如果是新手第一次抽卡，抽完自動回到 Deck 頁面或 Home 頁面
+    if (document.getElementById('page-gacha').classList.contains('hidden')) {
+        updateUIHeader(); // 確保 UI 刷新
+    }
 };
 
 // ==========================================
@@ -401,7 +416,6 @@ window.renderDeck = (filter) => {
         myCards = myCards.filter(c => c.data.rarity === filter);
     }
 
-    // 排序: 稀有度 -> 戰力
     const rarityVal = { 'SSR': 4, 'SR': 3, 'R': 2, 'N': 1 };
     myCards.sort((a, b) => {
         if (rarityVal[b.data.rarity] !== rarityVal[a.data.rarity]) 
@@ -419,7 +433,6 @@ window.renderDeck = (filter) => {
     });
 };
 
-// 通用卡牌渲染
 function renderCardHTML(card) {
     const colorMap = { 'SSR': 'text-yellow-400', 'SR': 'text-purple-400', 'R': 'text-blue-400', 'N': 'text-gray-400' };
     return `
