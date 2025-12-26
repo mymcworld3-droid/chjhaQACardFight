@@ -2,7 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, 
-    query, orderBy, limit, getDocs, serverTimestamp, where, onSnapshot, runTransaction 
+    query, orderBy, limit, getDocs, serverTimestamp, where, onSnapshot, runTransaction, 
+    writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Firebase Config
@@ -22,47 +23,57 @@ const db = getFirestore();
 const provider = new GoogleAuthProvider();
 
 // ==========================================
-// 🃏 卡牌資料庫 (新增技能與特性)
+// 🃏 卡牌資料庫 (Card Database) - 升級版
 // ==========================================
 const CARD_DB = [
-    // SSR
-    { id: 'ssr_001', name: '愛因斯坦', rarity: 'SSR', type: 'sci', power: 2500, hp: 3000, icon: 'fa-atom', 
-      skill: { name: "相對論衝擊", desc: "造成 1.5倍 傷害", type: "atk", val: 1.5 },
-      subTrait: { name: "光速運算", desc: "主卡攻擊 +10%", type: "buff_atk", val: 0.1 } 
+    // SSR (5%)
+    { 
+        id: 'ssr_001', name: '愛因斯坦', title: '光之物理學家', rarity: 'SSR', type: 'sci', 
+        power: 2500, hp: 3000, icon: 'fa-atom',
+        skill: { name: "相對論", desc: "造成 1.5倍 攻擊傷害", type: "atk", val: 1.5 },
+        subTrait: { name: "光速運算", desc: "主卡攻擊力 +15%", type: "buff_atk", val: 0.15 }
     },
-    { id: 'ssr_002', name: '秦始皇', rarity: 'SSR', type: 'his', power: 2400, hp: 3500, icon: 'fa-dragon',
-      skill: { name: "萬里長城", desc: "恢復 20% 生命", type: "heal", val: 0.2 },
-      subTrait: { name: "帝王威嚴", desc: "主卡生命 +10%", type: "buff_hp", val: 0.1 }
-    },
-    { id: 'ssr_003', name: '達文西', rarity: 'SSR', type: 'art', power: 2350, hp: 3200, icon: 'fa-palette',
-      skill: { name: "文藝復興", desc: "造成 1.2倍 傷害並恢復 10% 生命", type: "mix", val: 1.2 },
-      subTrait: { name: "黃金比例", desc: "主卡攻擊 +8%", type: "buff_atk", val: 0.08 }
-    },
-    
-    // SR
-    { id: 'sr_001', name: '拿破崙', rarity: 'SR', type: 'war', power: 1800, hp: 2500, icon: 'fa-person-rifle',
-      skill: { name: "滑鐵盧砲擊", desc: "造成 1.3倍 傷害", type: "atk", val: 1.3 },
-      subTrait: { name: "進軍", desc: "主卡攻擊 +5%", type: "buff_atk", val: 0.05 }
+    { 
+        id: 'ssr_002', name: '秦始皇', title: '千古一帝', rarity: 'SSR', type: 'his', 
+        power: 2400, hp: 3500, icon: 'fa-dragon',
+        skill: { name: "萬里長城", desc: "回復 30% 最大生命", type: "heal", val: 0.3 },
+        subTrait: { name: "帝王威嚴", desc: "主卡生命值 +20%", type: "buff_hp", val: 0.2 }
     },
     
-    // N
-    { id: 'n_001', name: '步兵', rarity: 'N', type: 'war', power: 500, hp: 1000, icon: 'fa-person',
-      skill: { name: "突刺", desc: "造成 1.1倍 傷害", type: "atk", val: 1.1 },
-      subTrait: { name: "後勤", desc: "主卡生命 +200", type: "buff_hp_flat", val: 200 }
+    // SR (15%)
+    { 
+        id: 'sr_001', name: '拿破崙', title: '征服者', rarity: 'SR', type: 'war', 
+        power: 1800, hp: 2500, icon: 'fa-person-rifle',
+        skill: { name: "滑鐵盧砲擊", desc: "造成 1.3倍 攻擊傷害", type: "atk", val: 1.3 },
+        subTrait: { name: "進軍", desc: "主卡攻擊力 +10%", type: "buff_atk", val: 0.1 }
     },
+    { 
+        id: 'sr_002', name: '居禮夫人', title: '放射之母', rarity: 'SR', type: 'sci', 
+        power: 1750, hp: 2400, icon: 'fa-flask',
+        skill: { name: "鐳射線", desc: "造成 1.2倍 傷害", type: "atk", val: 1.2 },
+        subTrait: { name: "研究精神", desc: "主卡生命值 +10%", type: "buff_hp", val: 0.1 }
+    },
+
+    // R (30%)
+    { id: 'r_001', name: '牛頓', title: '力學', rarity: 'R', type: 'sci', power: 1200, hp: 1800, icon: 'fa-apple-whole', skill: {name:"重力", desc:"1.1倍傷", type:"atk", val:1.1}, subTrait: {name:"力學", desc:"攻+5%", type:"buff_atk", val:0.05} },
+    { id: 'r_002', name: '孔子', title: '至聖', rarity: 'R', type: 'his', power: 1150, hp: 2000, icon: 'fa-scroll', skill: {name:"教誨", desc:"回15%血", type:"heal", val:0.15}, subTrait: {name:"仁愛", desc:"血+8%", type:"buff_hp", val:0.08} },
+
+    // N (50%)
+    { id: 'n_001', name: '步兵', title: '士兵', rarity: 'N', type: 'war', power: 500, hp: 1000, icon: 'fa-person', skill: {name:"突刺", desc:"1倍傷", type:"atk", val:1.0}, subTrait: {name:"後勤", desc:"血+50", type:"buff_hp_flat", val:50} },
+    { id: 'n_002', name: '弓手', title: '士兵', rarity: 'N', type: 'war', power: 450, hp: 900, icon: 'fa-bow-arrow', skill: {name:"射擊", desc:"1倍傷", type:"atk", val:1.0}, subTrait: {name:"支援", desc:"攻+20", type:"buff_atk_flat", val:20} },
 ];
 
 const GACHA_RATES = { SSR: 0.05, SR: 0.20, R: 0.50 };
 
-// 狀態變數
+// 全域狀態
 let currentUserData = null;
 let quizBuffer = [];
-let currentActiveQuiz = null;
 const BUFFER_SIZE = 3;
 let isFetchingQuiz = false;
+let currentActiveQuiz = null; 
 let currentLang = 'zh-TW';
 
-// 對戰相關變數
+// 對戰相關
 let battleUnsub = null;
 let currentRoomId = null;
 let myBattleRole = null; // 'host' or 'guest'
@@ -101,6 +112,7 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         updateUIHeader();
+        updateSettingsUI();
         renderHomeHero();
         switchToPage('page-home');
         fillQuizBuffer();
@@ -111,10 +123,10 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ==========================================
-// ⚔️ PVP 對戰系統 (核心邏輯)
+// ⚔️ PVP 對戰系統 (Battle Logic)
 // ==========================================
 
-// 1. 開始配對
+// 1. 開始配對 (進入備戰室)
 window.startPvpMatchmaking = async () => {
     if (!currentUserData.cardInventory.length) return alert("請先去召喚至少一張英靈！");
     
@@ -124,7 +136,7 @@ window.startPvpMatchmaking = async () => {
     updateSetupUI();
 };
 
-// 2. 選擇牌組介面邏輯
+// 2. 選擇卡牌
 window.openCardSelector = (slot) => {
     const modal = document.getElementById('selector-modal');
     const grid = document.getElementById('selector-grid');
@@ -132,11 +144,14 @@ window.openCardSelector = (slot) => {
     grid.innerHTML = '';
 
     // 顯示擁有的卡片
-    const cards = currentUserData.cardInventory.map(c => ({...c, data: CARD_DB.find(db => db.id === c.cardId)}));
+    const cards = currentUserData.cardInventory.map(c => ({...c, data: CARD_DB.find(db => db.id === c.cardId)})).filter(c=>c.data);
     
+    // 排序
+    cards.sort((a, b) => b.data.power - a.data.power);
+
     cards.forEach(c => {
         const div = document.createElement('div');
-        div.className = `card-frame rarity-${c.data.rarity} scale-90`;
+        div.className = `card-frame rarity-${c.data.rarity} scale-90 cursor-pointer`;
         div.innerHTML = renderCardHTML(c.data);
         div.onclick = () => {
             selectedDeck[slot] = c.data;
@@ -151,19 +166,46 @@ function updateSetupUI() {
     const mainSlot = document.getElementById('setup-slot-main');
     const subSlot = document.getElementById('setup-slot-sub');
     const btn = document.getElementById('btn-battle-ready');
+    const previewDiv = document.getElementById('setup-stats-preview');
 
+    // 渲染主卡槽
     if (selectedDeck.main) {
         mainSlot.innerHTML = renderCardHTML(selectedDeck.main);
-        mainSlot.classList.add('filled', `rarity-${selectedDeck.main.rarity}`);
-    }
-    if (selectedDeck.sub) {
-        subSlot.innerHTML = renderCardHTML(selectedDeck.sub);
-        subSlot.classList.add('filled', `rarity-${selectedDeck.sub.rarity}`);
+        mainSlot.classList.remove('border-dashed');
+        mainSlot.className = `w-24 h-32 rounded-xl overflow-hidden shadow-lg border-2 rarity-${selectedDeck.main.rarity}`;
     }
 
+    // 渲染副卡槽
+    if (selectedDeck.sub) {
+        subSlot.innerHTML = renderCardHTML(selectedDeck.sub);
+        subSlot.classList.remove('border-dashed');
+        subSlot.className = `w-24 h-32 rounded-xl overflow-hidden shadow-lg border-2 rarity-${selectedDeck.sub.rarity}`;
+    }
+
+    // 計算預覽數值
     if (selectedDeck.main && selectedDeck.sub) {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        previewDiv.classList.remove('hidden');
+
+        // 計算特性加成
+        let finalHp = selectedDeck.main.hp;
+        let finalAtk = selectedDeck.main.power;
+        const sub = selectedDeck.sub;
+
+        if (sub.subTrait) {
+            if (sub.subTrait.type === 'buff_hp') finalHp *= (1 + sub.subTrait.val);
+            if (sub.subTrait.type === 'buff_atk') finalAtk *= (1 + sub.subTrait.val);
+            if (sub.subTrait.type === 'buff_hp_flat') finalHp += sub.subTrait.val;
+            if (sub.subTrait.type === 'buff_atk_flat') finalAtk += sub.subTrait.val;
+        }
+
+        document.getElementById('preview-hp').innerText = Math.floor(finalHp);
+        document.getElementById('preview-atk').innerText = Math.floor(finalAtk);
+        document.getElementById('preview-skills').innerHTML = `
+            <div>⚔️ 主: ${selectedDeck.main.skill.name}</div>
+            <div>🛡️ 副: ${selectedDeck.sub.subTrait.name}</div>
+        `;
     }
 }
 
@@ -173,18 +215,17 @@ window.confirmBattleDeck = async () => {
     btn.innerText = "尋找對手中...";
     btn.disabled = true;
 
-    // 計算最終屬性 (主卡 + 副卡特性)
+    // 計算戰鬥數據
     const main = selectedDeck.main;
     const sub = selectedDeck.sub;
-    
     let finalHp = main.hp;
-    let finalAtk = main.power; // 這裡用 power 當攻擊力
+    let finalAtk = main.power;
 
-    // 應用副卡特性
     if (sub.subTrait) {
         if (sub.subTrait.type === 'buff_hp') finalHp *= (1 + sub.subTrait.val);
         if (sub.subTrait.type === 'buff_atk') finalAtk *= (1 + sub.subTrait.val);
         if (sub.subTrait.type === 'buff_hp_flat') finalHp += sub.subTrait.val;
+        if (sub.subTrait.type === 'buff_atk_flat') finalAtk += sub.subTrait.val;
     }
 
     const myBattleData = {
@@ -196,24 +237,22 @@ window.confirmBattleDeck = async () => {
         atk: Math.floor(finalAtk),
         mainCard: main,
         subCard: sub,
-        ready: true,
-        answer: null // 'correct', 'wrong', null
+        answer: null
     };
 
-    // 簡單配對：找一個 waiting 的房間，沒有就創
+    // 配對邏輯
     const twoMinAgo = new Date(Date.now() - 120000);
     const q = query(collection(db, "pvp_rooms"), where("status", "==", "waiting"), where("createdAt", ">", twoMinAgo), limit(1));
     const snapshot = await getDocs(q);
 
     if (!snapshot.empty) {
-        // 加入現有房間
         const roomDoc = snapshot.docs[0];
-        if (roomDoc.data().host.uid !== auth.currentUser.uid) { // 避免自己撞自己
+        if (roomDoc.data().host.uid !== auth.currentUser.uid) {
             await updateDoc(doc(db, "pvp_rooms", roomDoc.id), {
                 guest: myBattleData,
                 status: "battle",
                 turn: 1,
-                attacker: Math.random() < 0.5 ? 'host' : 'guest' // 隨機先攻
+                attacker: Math.random() < 0.5 ? 'host' : 'guest' // 隨機先手
             });
             currentRoomId = roomDoc.id;
             myBattleRole = 'guest';
@@ -222,42 +261,42 @@ window.confirmBattleDeck = async () => {
         }
     }
 
-    // 創建新房間
+    // 創房
     const docRef = await addDoc(collection(db, "pvp_rooms"), {
         host: myBattleData,
         guest: null,
         status: "waiting",
         createdAt: serverTimestamp(),
-        turn: 1,
-        logs: []
+        turn: 1
     });
     currentRoomId = docRef.id;
     myBattleRole = 'host';
     initBattleInterface();
 };
 
-// 4. 戰鬥介面初始化與監聽
+// 4. 戰鬥畫面
 function initBattleInterface() {
     switchToPage('page-battle-arena');
-    document.getElementById('battle-layer').classList.remove('hidden');
+    document.getElementById('battle-quiz-layer').classList.add('hidden');
     document.getElementById('battle-status-msg').innerText = "等待對手...";
     
-    // 渲染我方資訊
-    updateBattleDisplay({ hp: selectedDeck.main.hp, maxHp: selectedDeck.main.hp }, 'my'); // 初始顯示
-    
-    // 監聽房間
+    updateBattleDisplay(null, 'my', {hp: selectedDeck.main.hp, maxHp: selectedDeck.main.hp}); // 初始佔位
+
     battleUnsub = onSnapshot(doc(db, "pvp_rooms", currentRoomId), async (docSnap) => {
         if (!docSnap.exists()) return;
         const room = docSnap.data();
 
-        // 雙方都到齊
         if (room.status === "battle") {
             const me = room[myBattleRole];
             const enemy = room[myBattleRole === 'host' ? 'guest' : 'host'];
             
-            // 更新雙方血量 UI
             updateBattleDisplay(me, 'my');
             updateBattleDisplay(enemy, 'enemy');
+
+            // 顯示當前先攻方
+            const attackerName = room.attacker === myBattleRole ? "我方" : "敵方";
+            const color = room.attacker === myBattleRole ? "text-green-400" : "text-red-400";
+            document.getElementById('battle-status-msg').innerHTML = `第 ${room.turn} 回合<br><span class="text-sm text-gray-400">先攻: <span class="${color}">${attackerName}</span></span>`;
 
             // 判斷勝負
             if (me.hp <= 0 || enemy.hp <= 0) {
@@ -265,172 +304,139 @@ function initBattleInterface() {
                 return;
             }
 
-            // 流程控制 (Host 負責發題與結算，Guest 負責聽)
-            // 階段 1: 答題階段 (還沒有題目或題目已過期)
+            // 流程: Host 發題 -> 雙方顯示 -> 雙方作答 -> Host 結算
             if (!room.currentQuestion) {
-                document.getElementById('battle-status-msg').innerText = `第 ${room.turn} 回合：準備答題`;
-                if (myBattleRole === 'host') {
-                    // Host 產生題目
-                    await generateBattleQuestion(currentRoomId);
-                }
-            } else if (room.currentQuestion && me.answer === null) {
-                // 階段 2: 顯示題目 (如果我還沒答)
+                if (myBattleRole === 'host') await generateBattleQuestion(currentRoomId);
+            } else if (me.answer === null) {
                 showBattleQuestion(room.currentQuestion);
             } else if (me.answer !== null && enemy.answer === null) {
-                // 階段 3: 等待對手
-                document.getElementById('battle-quiz-box').classList.add('hidden');
+                document.getElementById('battle-quiz-layer').classList.add('hidden');
                 document.getElementById('battle-status-msg').innerText = "等待對手作答...";
             } else if (me.answer !== null && enemy.answer !== null) {
-                // 階段 4: 雙方都答完，顯示結算動畫 (Host 負責計算數據)
                 document.getElementById('battle-status-msg').innerText = "回合結算中...";
-                if (myBattleRole === 'host') {
-                    resolveTurn(room);
-                }
+                if (myBattleRole === 'host') resolveTurn(room);
             }
         }
     });
 }
 
-function updateBattleDisplay(data, side) {
-    if (!data) return;
-    const hpPercent = (data.hp / data.maxHp) * 100;
-    document.getElementById(`${side}-hp-bar`).style.width = `${Math.max(0, hpPercent)}%`;
-    document.getElementById(`${side}-hp-text`).innerText = `${Math.max(0, data.hp)}/${data.maxHp}`;
-    document.getElementById(`${side}-name`).innerText = data.name;
+function updateBattleDisplay(data, side, fallback) {
+    const info = data || fallback;
+    if (!info) return;
+
+    const hpPercent = (info.hp / info.maxHp) * 100;
+    const bar = document.getElementById(`${side}-hp-bar`);
+    bar.style.width = `${Math.max(0, hpPercent)}%`;
     
-    // 只在第一次渲染卡牌圖示
-    const mainDiv = document.getElementById(`${side}-card-main`);
-    if (!mainDiv.innerHTML && data.mainCard) {
-        mainDiv.innerHTML = `<i class="fa-solid ${data.mainCard.icon} text-2xl text-white flex justify-center items-center h-full"></i>`;
-        if (side === 'my') {
-            document.getElementById('my-skill-tooltip').innerText = `技能：${data.mainCard.skill.name}\n${data.mainCard.skill.desc}`;
+    // 血量低變色
+    if (hpPercent < 30) bar.className = "h-full bg-red-600 transition-all duration-500 animate-pulse";
+    else bar.className = `h-full ${side==='my'?'bg-green-500':'bg-red-500'} transition-all duration-500`;
+
+    document.getElementById(`${side}-hp-text`).innerText = `${Math.max(0, info.hp)}/${info.maxHp}`;
+    if (data) {
+        document.getElementById(`${side}-name`).innerText = data.name;
+        // 渲染卡牌小圖
+        const mainDiv = document.getElementById(`${side}-card-main`);
+        if(mainDiv.innerHTML === "") {
+            mainDiv.innerHTML = `<i class="fa-solid ${data.mainCard.icon} text-2xl text-white/50 flex items-center justify-center h-full"></i>`;
+            mainDiv.className = `w-12 h-16 rounded border-2 rarity-${data.mainCard.rarity} bg-slate-800`;
         }
     }
 }
 
-// 產生共用題目
 async function generateBattleQuestion(roomId) {
-    // 這裡為了速度，直接從本地 Buffer 拿，如果沒有就 call API (簡化版)
     let q = null;
     if (quizBuffer.length > 0) q = quizBuffer.shift();
     else {
-        await fetchOneQuestion(); // 強制抓
+        await fetchOneQuestion(); 
         q = quizBuffer.shift();
     }
-    fillQuizBuffer(); // 補貨
-
-    await updateDoc(doc(db, "pvp_rooms", roomId), {
-        currentQuestion: q
-    });
+    fillQuizBuffer(); 
+    await updateDoc(doc(db, "pvp_rooms", roomId), { currentQuestion: q });
 }
 
 function showBattleQuestion(q) {
-    document.getElementById('battle-status-msg').innerText = "";
-    document.getElementById('battle-quiz-box').classList.remove('hidden');
+    document.getElementById('battle-quiz-layer').classList.remove('hidden');
     document.getElementById('battle-q-text').innerText = q.q;
-    
     const container = document.getElementById('battle-options');
     container.innerHTML = '';
-    q.options.forEach((opt, idx) => {
+    
+    q.options.forEach(opt => {
         const btn = document.createElement('button');
-        btn.className = "w-full text-left p-3 bg-slate-700 hover:bg-slate-600 rounded border border-slate-500 mb-2";
+        btn.className = "w-full text-left p-4 bg-slate-700 hover:bg-slate-600 rounded-xl border border-slate-600 mb-2 font-bold";
         btn.innerText = opt;
-        btn.onclick = () => submitBattleAnswer(opt === q.correct);
+        btn.onclick = () => {
+            const isCorrect = (opt === q.correct);
+            submitBattleAnswer(isCorrect);
+        };
         container.appendChild(btn);
     });
 }
 
 async function submitBattleAnswer(isCorrect) {
-    // 隱藏題目
-    document.getElementById('battle-quiz-box').classList.add('hidden');
-    document.getElementById('battle-status-msg').innerText = "上傳答案中...";
-    
-    const updateData = {};
-    updateData[`${myBattleRole}.answer`] = isCorrect ? 'correct' : 'wrong';
-    
-    await updateDoc(doc(db, "pvp_rooms", currentRoomId), updateData);
+    document.getElementById('battle-quiz-layer').classList.add('hidden');
+    await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
+        [`${myBattleRole}.answer`]: isCorrect ? 'correct' : 'wrong'
+    });
 }
 
-// 回合結算 (Host Only)
+// Host 負責結算邏輯
 async function resolveTurn(room) {
     const host = room.host;
     const guest = room.guest;
     
-    // 1. 決定攻擊順序 (先攻者先結算)
-    const first = room.attacker === 'host' ? host : guest;
-    const second = room.attacker === 'host' ? guest : host;
+    // 誰先攻
     const firstRole = room.attacker;
     const secondRole = room.attacker === 'host' ? 'guest' : 'host';
+    const first = room[firstRole];
+    const second = room[secondRole];
 
-    let logMsg = "";
     let newHostHp = host.hp;
     let newGuestHp = guest.hp;
+    let damageText = "";
 
-    // 先攻者攻擊
+    // 1. 先手攻擊 (如果答對)
     if (first.answer === 'correct') {
-        const dmg = calculateDamage(first);
-        if (firstRole === 'host') newGuestHp -= dmg;
-        else newHostHp -= dmg;
-        logMsg += `${first.name} 發動攻擊！造成 ${dmg} 傷害。\n`;
-    } else {
-        logMsg += `${first.name} 答錯了，錯失良機。\n`;
-    }
-
-    // 若後手還活著，換後手攻擊
-    if (newHostHp > 0 && newGuestHp > 0) {
-        if (second.answer === 'correct') {
-            const dmg = calculateDamage(second);
-            if (secondRole === 'host') newGuestHp -= dmg;
-            else newHostHp -= dmg;
-            logMsg += `${second.name} 反擊！造成 ${dmg} 傷害。`;
-        } else {
-            logMsg += `${second.name} 答錯了。`;
+        const dmg = Math.floor(first.atk * (first.mainCard.skill.type === 'atk' ? first.mainCard.skill.val : 1));
+        if (firstRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
+        damageText = `${first.name} 造成 ${dmg} 傷害!`;
+        
+        // 技能回復
+        if (first.mainCard.skill.type === 'heal') {
+            const heal = Math.floor(first.maxHp * first.mainCard.skill.val);
+            if (firstRole === 'host') newHostHp += heal; else newGuestHp += heal;
         }
     }
 
-    // 2. 清除答案，換下一回合，交換先攻
-    // 這裡需要延遲一下讓前端有時間看動畫 (我們簡化直接更新)
-    setTimeout(async () => {
-        await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
-            "host.hp": newHostHp,
-            "guest.hp": newGuestHp,
-            "host.answer": null,
-            "guest.answer": null,
-            currentQuestion: null,
-            turn: room.turn + 1,
-            attacker: room.attacker === 'host' ? 'guest' : 'host', // 交換先攻
-            lastLog: logMsg
-        });
-    }, 2000);
-}
-
-function calculateDamage(playerData) {
-    let dmg = playerData.atk;
-    // 技能發動 (簡單版：答對必定發動技能)
-    const skill = playerData.mainCard.skill;
-    if (skill.type === 'atk' || skill.type === 'mix') {
-        dmg = Math.floor(dmg * skill.val);
+    // 2. 後手攻擊 (如果還活著且答對)
+    if (newHostHp > 0 && newGuestHp > 0) {
+        if (second.answer === 'correct') {
+            const dmg = Math.floor(second.atk * (second.mainCard.skill.type === 'atk' ? second.mainCard.skill.val : 1));
+            if (secondRole === 'host') newGuestHp -= dmg; else newHostHp -= dmg;
+        }
     }
-    // 這裡可以加入暴擊運算
-    return dmg;
+
+    // 更新狀態
+    await updateDoc(doc(db, "pvp_rooms", currentRoomId), {
+        "host.hp": newHostHp,
+        "guest.hp": newGuestHp,
+        "host.answer": null,
+        "guest.answer": null,
+        currentQuestion: null,
+        turn: room.turn + 1,
+        attacker: secondRole // 交換先手
+    });
 }
 
 function endBattle(isWin) {
     if (battleUnsub) battleUnsub();
-    
     alert(isWin ? "戰鬥勝利！獲得 100 G" : "戰鬥失敗...");
-    
     if (isWin) {
         const newGold = currentUserData.gold + 100;
-        currentUserData.gold = newGold;
         updateDoc(doc(db, "users", auth.currentUser.uid), { gold: newGold });
     }
-    
     switchToPage('page-home');
-    // 清理房間 (Host負責)
-    if (myBattleRole === 'host') {
-        deleteDoc(doc(db, "pvp_rooms", currentRoomId));
-    }
+    if (myBattleRole === 'host') deleteDoc(doc(db, "pvp_rooms", currentRoomId));
 }
 
 // ==========================================
@@ -463,12 +469,9 @@ window.saveSettings = async () => {
     try {
         await updateDoc(doc(db, "users", auth.currentUser.uid), { settings: newSettings });
         currentUserData.settings = newSettings;
-        
-        // 清空舊緩衝，因為題目設定變了
         quizBuffer = []; 
         fillQuizBuffer();
-        
-        alert("設定已更新！接下來的討伐將套用新設定。");
+        alert("設定已更新！");
     } catch (e) {
         console.error(e);
         alert("保存失敗");
@@ -576,14 +579,12 @@ window.startAdventure = async () => {
     renderNextQuestion();
 };
 
-// 決定下一個題目主題
 function getNextSubject() {
     const s = currentUserData.settings || {};
     const weakList = s.weak ? s.weak.split(/[,，\s]+/).filter(v=>v) : [];
     const strongList = s.strong ? s.strong.split(/[,，\s]+/).filter(v=>v) : [];
     const fallback = ["歷史", "科學", "地理", "常識", "科技"];
 
-    // 60% 機率出弱項，30% 機率出強項，10% 隨機
     const rand = Math.random();
     if (weakList.length > 0 && rand < 0.6) {
         return weakList[Math.floor(Math.random() * weakList.length)];
@@ -621,7 +622,6 @@ async function fetchOneQuestion() {
         let options = [quizData.correct, ...quizData.wrong];
         options.sort(() => Math.random() - 0.5);
         
-        // 加上主題標籤，方便顯示
         quizBuffer.push({ ...quizData, options, subject: targetSubject });
         return true;
     } catch (e) {
@@ -653,7 +653,6 @@ function renderQuizToDOM(quiz) {
     document.getElementById('quiz-feedback').classList.add('hidden');
 
     document.getElementById('question-text').innerText = quiz.q;
-    // document.getElementById('quiz-target-subject').innerText = `目標：${quiz.subject || '未知領域'}`;
     
     const container = document.getElementById('options-container');
     container.innerHTML = '';
