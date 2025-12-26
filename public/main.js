@@ -577,6 +577,19 @@ function renderHomeHero() {
 }
 
 window.switchToPage = (pageId) => {
+    // 🔥 新增：檢測是否離開對戰相關頁面
+    // 如果當前有房間 ID，且目標頁面不是「備戰室」或「競技場」，代表玩家想離開
+    const isBattlePage = (pageId === 'page-battle-setup' || pageId === 'page-battle-arena');
+    
+    if (currentRoomId && !isBattlePage) {
+        // 如果正在戰鬥中，詢問是否中離 (可選)
+        // if (!confirm("正在配對或戰鬥中，確定要離開嗎？")) return; 
+        
+        // 執行離開邏輯 (傳入 false 代表不執行內部跳轉，因為我們正在執行 switchToPage)
+        leaveBattle(false);
+    }
+
+    // --- 原有邏輯 ---
     document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
     document.getElementById(pageId).classList.remove('hidden');
     
@@ -895,3 +908,16 @@ function getAttrIcon(type) {
     const map = { 'sci': 'fa-flask', 'his': 'fa-scroll', 'art': 'fa-palette', 'war': 'fa-meteor' };
     return map[type] || 'fa-star';
 }
+// 瀏覽器關閉/重整時的防護
+window.addEventListener('beforeunload', (e) => {
+    if (currentRoomId) {
+        // 嘗試在背景刪除 (不保證成功，但在現代瀏覽器有機會)
+        // 這裡只能做盡力而為的清理
+        if (myBattleRole === 'host') {
+            // 使用 Beacon API 或簡單的 fetch 可能無法處理 Firestore auth
+            // 所以這裡主要目的是彈出警告
+            e.preventDefault();
+            e.returnValue = ''; // 觸發瀏覽器預設的「確定要離開嗎？」彈窗
+        }
+    }
+});
