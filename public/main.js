@@ -845,6 +845,8 @@ function renderQuizToDOM(quiz) {
     document.getElementById('quiz-feedback').classList.add('hidden');
 
     document.getElementById('question-text').innerText = quiz.q;
+
+    document.getElementById('quiz-subject-tag').innerText = quiz.subject || "一般";
     
     const container = document.getElementById('options-container');
     container.innerHTML = '';
