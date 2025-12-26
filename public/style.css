@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+
+body {
+    font-family: 'Noto Sans TC', sans-serif;
+    user-select: none;
+    background-color: #020617; /* Slate-950 */
+}
+
+/* 隱藏滾動條但保留功能 */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Loading Spinner */
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #FFF;
+    border-bottom-color: #3b82f6;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+@keyframes rotation {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Card Styles */
+.card-frame {
+    position: relative;
+    aspect-ratio: 2/3;
+    background: #1e293b;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 2px solid #334155;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+}
+
+.card-frame:active {
+    transform: scale(0.96);
+}
+
+/* Rarity Colors */
+.rarity-SSR { 
+    border-color: #f59e0b; 
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); 
+    background: radial-gradient(circle at top right, #451a03, #0f172a);
+}
+.rarity-SR { 
+    border-color: #a855f7; 
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4); 
+    background: radial-gradient(circle at top right, #3b0764, #0f172a);
+}
+.rarity-R { 
+    border-color: #3b82f6; 
+    background: radial-gradient(circle at top right, #172554, #0f172a);
+}
+.rarity-N { 
+    border-color: #64748b; 
+    background: #1e293b;
+}
+
+.card-inner {
+    padding: 0.5rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-image {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+
+.card-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+}
+
+/* Animations */
+@keyframes pop-in {
+    0% { opacity: 0; transform: scale(0.5); }
+    100% { opacity: 1; transform: scale(1); }
+}
+.animate-pop {
+    animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes flip-in {
+    0% { opacity: 0; transform: rotateY(90deg); }
+    100% { opacity: 1; transform: rotateY(0deg); }
+}
+.card-reveal {
+    animation: flip-in 0.6s ease-out forwards;
+}
+
+.nav-locked {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.nav-btn.active i {
+    color: #38bdf8; /* sky-400 */
+}
+.nav-btn.active span {
+    color: white;
+}
